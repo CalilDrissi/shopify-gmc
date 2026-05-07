@@ -1,0 +1,90 @@
+@use '../abstracts' as a;
+
+.c-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: a.$space-3;
+  padding: a.$space-4 a.$space-5;
+  border-radius: var(--md-sys-shape-medium);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background-color: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+
+  &__icon {
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    @include a.style(title-large);
+  }
+
+  &__body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: a.$space-1;
+  }
+
+  &__title {
+    @include a.style(title-medium);
+    margin: 0;
+  }
+
+  &__message {
+    @include a.style(body-medium);
+    margin: 0;
+    color: inherit;
+  }
+
+  &__action {
+    flex: 0 0 auto;
+    display: flex;
+    gap: a.$space-2;
+  }
+
+  &--info {
+    background-color: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+    border-color: transparent;
+  }
+
+  &--warning {
+    background-color: var(--md-sys-color-tertiary-container);
+    color: var(--md-sys-color-on-tertiary-container);
+    border-color: transparent;
+  }
+
+  &--critical {
+    background-color: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-on-error-container);
+    border-color: transparent;
+  }
+
+  &--success {
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    border-color: transparent;
+  }
+}
+
+// Persistent red banner shown across tenant pages while an admin is impersonating.
+.c-impersonation {
+  display: flex;
+  align-items: center;
+  gap: a.$space-4;
+  padding: a.$space-3 a.$space-5;
+  background-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+  @include a.style(label-large);
+
+  &__body {
+    flex: 1 1 auto;
+  }
+
+  .c-button--filled {
+    background-color: var(--md-sys-color-on-error);
+    color: var(--md-sys-color-error);
+  }
+}

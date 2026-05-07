@@ -1,0 +1,20 @@
+{{- /*
+  Component: c-form-field
+  Data shape:
+    Label string  - label text                       (required)
+    Hint  string  - helper text under the input      (optional)
+    Error string  - error message; sets invalid state(optional)
+    Input <input data shape from "input" partial>    (required)
+*/ -}}
+{{ define "form-field" -}}
+{{- $invalid := ne .Error "" -}}
+<div class="c-form-field{{ if $invalid }} c-form-field--invalid{{ end }}">
+  <label class="c-form-field__label" for="{{ .Input.ID }}">
+    {{- .Label -}}
+    {{- if .Input.Required }} <span class="c-form-field__required" aria-label="required">*</span>{{ end -}}
+  </label>
+  {{ template "input" .Input }}
+  {{- if .Error }}<p class="c-form-field__error" role="alert">{{ .Error }}</p>{{ end }}
+  {{- if .Hint }}<p class="c-form-field__hint">{{ .Hint }}</p>{{ end }}
+</div>
+{{- end }}

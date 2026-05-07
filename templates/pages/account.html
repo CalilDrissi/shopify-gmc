@@ -1,0 +1,35 @@
+{{ define "content" }}
+<h1 class="page-title">Account</h1>
+
+<article class="c-card c-card--outlined">
+  <div class="c-card__header">
+    <h2 class="c-card__title">{{ if .User.Name }}{{ .User.Name }}{{ else }}—{{ end }}</h2>
+    <p class="c-card__subtitle">{{ .User.Email }}{{ if .User.EmailVerifiedAt }} · verified{{ else }} · unverified{{ end }}</p>
+  </div>
+</article>
+
+<article class="c-card c-card--outlined">
+  <div class="c-card__header">
+    <h2 class="c-card__title">Workspaces</h2>
+    <p class="c-card__subtitle">Click a workspace to make it your default and jump in.</p>
+  </div>
+  <div class="c-card__body">
+    <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px;">
+      {{- range .Memberships }}
+      <li style="display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--md-sys-color-outline-variant);">
+        <div style="flex:1;">
+          <div><strong>{{ .Name }}</strong> {{ if .IsDefault }}<span class="c-pill c-pill--success">default</span>{{ end }}</div>
+          <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">{{ .Role }} · {{ .Plan }}</div>
+        </div>
+        <form method="post" action="/account/switch/{{ .TenantID }}">
+          <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+          <button type="submit" class="c-button c-button--outlined c-button--small">
+            <span class="c-button__label">Open</span>
+          </button>
+        </form>
+      </li>
+      {{- end }}
+    </ul>
+  </div>
+</article>
+{{ end }}

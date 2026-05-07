@@ -1,0 +1,20 @@
+{{ define "content" }}
+<article class="c-card c-card--elevated">
+  <div class="c-card__header">
+    <h1 class="c-card__title">Create your workspace</h1>
+    <p class="c-card__subtitle">Free forever. Add a credit card later.</p>
+  </div>
+  <form class="c-card__body" method="post" action="/signup" style="display:flex; flex-direction:column; gap:16px;">
+    {{ template "form-field" .Fields.Name }}
+    {{ template "form-field" .Fields.Email }}
+    {{ template "form-field" .Fields.Workspace }}
+    {{ template "form-field" .Fields.Password }}
+    <button type="submit" class="c-button c-button--filled c-button--full-width">
+      <span class="c-button__label">Create workspace</span>
+    </button>
+    <p style="text-align:center; color:var(--md-sys-color-on-surface-variant);">
+      Already have an account? <a href="/login">Sign in</a>.
+    </p>
+  </form>
+</article>
+{{ end }}

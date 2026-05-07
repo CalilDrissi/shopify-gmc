@@ -27,6 +27,15 @@ type Session struct {
 	LastSeenAt time.Time
 	RevokedAt  *time.Time
 	CreatedAt  time.Time
+
+	// Impersonation state — set when an admin is acting on behalf of a tenant user.
+	ImpersonatingUserID   *uuid.UUID
+	ImpersonatingTenantID *uuid.UUID
+	ImpersonationLogID    *uuid.UUID
+}
+
+func (s Session) IsImpersonating() bool {
+	return s.ImpersonatingUserID != nil
 }
 
 type sessionRow struct {
@@ -39,6 +48,10 @@ type sessionRow struct {
 	LastSeenAt time.Time
 	RevokedAt  *time.Time
 	CreatedAt  time.Time
+
+	ImpersonatingUserID   *uuid.UUID
+	ImpersonatingTenantID *uuid.UUID
+	ImpersonationLogID    *uuid.UUID
 }
 
 type SessionDB interface {
@@ -46,6 +59,7 @@ type SessionDB interface {
 	FindActiveByTokenHash(ctx context.Context, tokenHash []byte, now time.Time) (sessionRow, error)
 	UpdateExpiry(ctx context.Context, id uuid.UUID, newExpires, newLastSeen time.Time) error
 	Revoke(ctx context.Context, id uuid.UUID, revokedAt time.Time) error
+	SetImpersonation(ctx context.Context, sessionID uuid.UUID, userID, tenantID, logID *uuid.UUID) error
 }
 
 type SessionStore struct {
@@ -112,14 +126,23 @@ func (s *SessionStore) Revoke(ctx context.Context, id uuid.UUID) error {
 
 func rowToSession(r sessionRow, token string) Session {
 	return Session{
-		ID:         r.ID,
-		UserID:     r.UserID,
-		Token:      token,
-		IPAddress:  r.IPAddress,
-		UserAgent:  r.UserAgent,
-		ExpiresAt:  r.ExpiresAt,
-		LastSeenAt: r.LastSeenAt,
-		RevokedAt:  r.RevokedAt,
-		CreatedAt:  r.CreatedAt,
+		ID:                    r.ID,
+		UserID:                r.UserID,
+		Token:                 token,
+		IPAddress:             r.IPAddress,
+		UserAgent:             r.UserAgent,
+		ExpiresAt:             r.ExpiresAt,
+		LastSeenAt:            r.LastSeenAt,
+		RevokedAt:             r.RevokedAt,
+		CreatedAt:             r.CreatedAt,
+		ImpersonatingUserID:   r.ImpersonatingUserID,
+		ImpersonatingTenantID: r.ImpersonatingTenantID,
+		ImpersonationLogID:    r.ImpersonationLogID,
 	}
+}
+
+// SetImpersonation marks an existing session as impersonating a user inside a tenant.
+// Pass userID=nil to clear.
+func (s *SessionStore) SetImpersonation(ctx context.Context, sessionID uuid.UUID, userID, tenantID, logID *uuid.UUID) error {
+	return s.db.SetImpersonation(ctx, sessionID, userID, tenantID, logID)
 }

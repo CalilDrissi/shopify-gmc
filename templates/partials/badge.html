@@ -1,0 +1,13 @@
+{{- /*
+  Component: c-badge
+  Data shape:
+    Label   string - text or count                              (optional, omitted for dot)
+    Variant string - primary | neutral | success (default error)(optional)
+    Dot     bool   - render as small dot indicator              (optional)
+*/ -}}
+{{ define "badge" -}}
+<span class="c-badge{{ if .Variant }} c-badge--{{ .Variant }}{{ end }}{{ if .Dot }} c-badge--dot{{ end }}"
+  {{- if .Dot }} aria-hidden="true"{{ end }}>
+  {{- if not .Dot }}{{ .Label }}{{ end -}}
+</span>
+{{- end }}

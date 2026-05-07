@@ -1,0 +1,18 @@
+{{ define "content" }}
+<article class="c-card c-card--elevated">
+  <div class="c-card__header">
+    <h1 class="c-card__title">Check your email</h1>
+    <p class="c-card__subtitle">We sent a confirmation link to {{ .Email }}.</p>
+  </div>
+  <div class="c-card__body">
+    <p>Click the link in the email to activate your account. The link expires in 24 hours.</p>
+    <p style="margin-top:16px;">Didn't receive it?</p>
+    <form method="post" action="/verify-email/resend" style="display:inline;">
+      <input type="hidden" name="email" value="{{ .Email }}">
+      <button type="submit" class="c-button c-button--text c-button--small">
+        <span class="c-button__label">Resend verification</span>
+      </button>
+    </form>
+  </div>
+</article>
+{{ end }}

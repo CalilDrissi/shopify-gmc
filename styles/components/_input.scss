@@ -1,0 +1,57 @@
+@use '../abstracts' as a;
+
+.c-input {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: a.$space-3 a.$space-4;
+  border-radius: var(--md-sys-shape-extra-small);
+  border: 1px solid var(--md-sys-color-outline);
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-sys-typescale-plain-font);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+
+  @include a.style(body-large);
+
+  &::placeholder {
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  &:hover:not(:disabled):not(:focus) {
+    border-color: var(--md-sys-color-on-surface);
+  }
+
+  &:focus,
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 0;
+    border-color: var(--md-sys-color-primary);
+  }
+
+  &:disabled,
+  &[readonly] {
+    color: var(--md-sys-color-on-surface-variant);
+    background-color: var(--md-sys-color-surface-container);
+  }
+
+  &:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+  }
+
+  &--invalid,
+  &[aria-invalid='true'] {
+    border-color: var(--md-sys-color-error);
+
+    &:focus,
+    &:focus-visible {
+      outline-color: var(--md-sys-color-error);
+      border-color: var(--md-sys-color-error);
+    }
+  }
+
+  &[type='number'] {
+    font-variant-numeric: tabular-nums;
+  }
+}

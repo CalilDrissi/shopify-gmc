@@ -1,0 +1,58 @@
+{{ define "layout-tenant" -}}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ if .Title }}{{ .Title }} · {{ end }}{{ .Tenant.Name }}</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <script src="/static/js/alpine.js" defer></script>
+</head>
+<body class="l-tenant">
+  {{ if .Impersonating }}
+    <aside class="c-impersonation" role="alert">
+      <div class="c-impersonation__body">
+        <strong>Impersonation active.</strong>
+        {{ if .Impersonator }}{{ .Impersonator.Email }}{{ else }}A platform admin{{ end }} is viewing as {{ .User.Email }} ({{ .Tenant.Name }}). Destructive writes are blocked.
+      </div>
+      <form method="post" action="/admin/impersonation/stop">
+        <input type="hidden" name="_csrf" value="{{ .CSRFToken }}">
+        <button type="submit" class="c-button c-button--filled c-button--small">
+          <span class="c-button__label">Stop impersonating</span>
+        </button>
+      </form>
+    </aside>
+  {{ end }}
+  <header class="l-tenant__topbar">
+    <div class="l-tenant__topbar-inner">
+      <a class="l-tenant__brand" href="/t/{{ .Tenant.Slug }}">gmcauditor</a>
+      <div class="l-tenant__switcher">
+        {{ template "tenant-switcher" . }}
+      </div>
+      <nav class="l-tenant__user">
+        <a href="/account">{{ if .User }}{{ .User.Email }}{{ else }}Account{{ end }}</a>
+        <form method="post" action="/logout" style="display:inline;">
+          <input type="hidden" name="_csrf" value="{{ .CSRFToken }}">
+          <button type="submit" class="c-button c-button--text c-button--small">
+            <span class="c-button__label">Sign out</span>
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+  <div class="l-tenant__shell">
+    <aside class="l-tenant__sidebar">
+      <nav>
+        <a href="/t/{{ .Tenant.Slug }}">Dashboard</a>
+        <a href="/t/{{ .Tenant.Slug }}/members">Members</a>
+        <a href="/account">Account</a>
+      </nav>
+    </aside>
+    <main class="l-tenant__main">
+      {{ if .Flash }}{{ template "banner" .Flash }}{{ end }}
+      {{ template "content" . }}
+    </main>
+  </div>
+</body>
+</html>
+{{- end }}

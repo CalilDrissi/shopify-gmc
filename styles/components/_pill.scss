@@ -1,0 +1,46 @@
+@use '../abstracts' as a;
+
+.c-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: a.$space-1;
+  height: 28px;
+  padding: 0 a.$space-3;
+  border-radius: var(--md-sys-shape-small);
+  white-space: nowrap;
+  @include a.style(label-medium);
+
+  &__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+  }
+
+  &--filled {
+    background-color: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  &--outlined {
+    background-color: transparent;
+    color: var(--md-sys-color-on-surface);
+    border: 1px solid var(--md-sys-color-outline);
+  }
+
+  &--success {
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+  }
+
+  &--warning {
+    background-color: var(--md-sys-color-tertiary-container);
+    color: var(--md-sys-color-on-tertiary-container);
+  }
+
+  &--critical {
+    background-color: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-on-error-container);
+  }
+}

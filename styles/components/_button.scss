@@ -1,0 +1,110 @@
+@use '../abstracts' as a;
+
+.c-button {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: a.$space-2;
+  min-height: 40px;
+  padding: 0 a.$space-6;
+  border: 0;
+  border-radius: var(--md-sys-shape-full);
+  font-family: var(--md-sys-typescale-plain-font);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+
+  @include a.style(label-large);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-color: currentColor;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+
+  &:hover::after         { opacity: var(--md-sys-state-hover-opacity); }
+  &:focus-visible::after { opacity: var(--md-sys-state-focus-opacity); }
+  &:active::after        { opacity: var(--md-sys-state-pressed-opacity); }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+  }
+
+  &--small {
+    min-height: 32px;
+    padding: 0 a.$space-4;
+    @include a.style(label-medium);
+  }
+
+  &--large {
+    min-height: 56px;
+    padding: 0 a.$space-8;
+    @include a.style(title-medium);
+  }
+
+  &--filled {
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+  }
+
+  &--tonal {
+    background-color: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  &--outlined {
+    background-color: transparent;
+    color: var(--md-sys-color-primary);
+    border: 1px solid var(--md-sys-color-outline);
+  }
+
+  &--text {
+    background-color: transparent;
+    color: var(--md-sys-color-primary);
+    padding: 0 a.$space-3;
+  }
+
+  &--full-width {
+    width: 100%;
+  }
+
+  &__spinner {
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: c-button-spin 0.7s linear infinite;
+  }
+
+  &.is-loading {
+    cursor: wait;
+
+    .c-button__label  { visibility: hidden; }
+    .c-button__spinner {
+      position: absolute;
+      inset: 0;
+      margin: auto;
+    }
+  }
+
+  &:disabled,
+  &[aria-disabled='true'] {
+    cursor: not-allowed;
+    opacity: 0.38;
+    pointer-events: none;
+    box-shadow: none;
+  }
+}
+
+@keyframes c-button-spin {
+  to { transform: rotate(360deg); }
+}

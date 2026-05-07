@@ -1,0 +1,274 @@
+@use '../abstracts' as a;
+
+// Public layout — narrow centered single column
+.l-public {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--md-sys-color-background);
+
+  &__topbar {
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    background-color: var(--md-sys-color-surface);
+  }
+
+  &__topbar-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: a.$space-3 a.$space-5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: a.$space-4;
+  }
+
+  &__brand {
+    @include a.style(title-large);
+    color: var(--md-sys-color-primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  &__nav {
+    display: flex;
+    align-items: center;
+    gap: a.$space-3;
+
+    a {
+      @include a.style(label-large);
+      color: var(--md-sys-color-on-surface);
+      text-decoration: none;
+      padding: a.$space-2 a.$space-3;
+      border-radius: var(--md-sys-shape-small);
+    }
+
+    a:hover {
+      background-color: var(--md-sys-color-surface-container);
+    }
+  }
+
+  &__nav-cta {
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary) !important;
+
+    &:hover {
+      background-color: var(--md-sys-color-primary) !important;
+      filter: brightness(1.06);
+    }
+  }
+
+  &__main {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: a.$space-8 a.$space-5;
+    display: flex;
+    flex-direction: column;
+    gap: a.$space-5;
+  }
+
+  &__footer {
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    padding: a.$space-4 a.$space-5;
+    color: var(--md-sys-color-on-surface-variant);
+    @include a.style(body-small);
+    display: flex;
+    justify-content: space-between;
+
+    nav {
+      display: flex;
+      gap: a.$space-3;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+  }
+}
+
+// Tenant layout — topbar + sidebar
+.l-tenant {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--md-sys-color-background);
+  display: flex;
+  flex-direction: column;
+
+  &__topbar {
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    background-color: var(--md-sys-color-surface);
+  }
+
+  &__topbar-inner {
+    padding: a.$space-3 a.$space-5;
+    display: flex;
+    align-items: center;
+    gap: a.$space-4;
+  }
+
+  &__brand {
+    @include a.style(title-medium);
+    color: var(--md-sys-color-primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  &__switcher {
+    flex: 0 1 auto;
+  }
+
+  &__user {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: a.$space-2;
+
+    a {
+      @include a.style(label-large);
+      color: var(--md-sys-color-on-surface);
+      text-decoration: none;
+      padding: a.$space-2 a.$space-3;
+    }
+  }
+
+  &__shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    flex: 1 1 auto;
+  }
+
+  &__sidebar {
+    border-right: 1px solid var(--md-sys-color-outline-variant);
+    padding: a.$space-4;
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: a.$space-1;
+
+      a {
+        @include a.style(label-large);
+        color: var(--md-sys-color-on-surface);
+        text-decoration: none;
+        padding: a.$space-2 a.$space-3;
+        border-radius: var(--md-sys-shape-small);
+
+        &:hover {
+          background-color: var(--md-sys-color-surface-container);
+        }
+      }
+    }
+  }
+
+  &__main {
+    padding: a.$space-6 a.$space-8;
+    max-width: 1100px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: a.$space-5;
+  }
+}
+
+// Platform admin — red accents
+.l-platform {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--md-sys-color-background);
+  display: flex;
+  flex-direction: column;
+
+  &__topbar {
+    background-color: var(--md-sys-color-error);
+    color: var(--md-sys-color-on-error);
+  }
+
+  &__topbar-inner {
+    padding: a.$space-3 a.$space-5;
+    display: flex;
+    align-items: center;
+    gap: a.$space-4;
+  }
+
+  &__brand {
+    @include a.style(title-medium);
+    color: var(--md-sys-color-on-error);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  &__user {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: a.$space-3;
+    color: var(--md-sys-color-on-error);
+
+    .c-button {
+      color: var(--md-sys-color-on-error);
+    }
+  }
+
+  &__shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    flex: 1 1 auto;
+  }
+
+  &__sidebar {
+    border-right: 1px solid var(--md-sys-color-outline-variant);
+    padding: a.$space-4;
+    background-color: var(--md-sys-color-surface-container-low);
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: a.$space-1;
+
+      a {
+        @include a.style(label-large);
+        color: var(--md-sys-color-on-surface);
+        text-decoration: none;
+        padding: a.$space-2 a.$space-3;
+        border-radius: var(--md-sys-shape-small);
+
+        &:hover {
+          background-color: var(--md-sys-color-surface-container);
+        }
+      }
+    }
+  }
+
+  &__main {
+    padding: a.$space-6 a.$space-8;
+    max-width: 1100px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: a.$space-5;
+  }
+}
+
+// Page utility
+.page-title {
+  margin-bottom: a.$space-4;
+}
+
+.hero {
+  text-align: center;
+  padding: a.$space-12 a.$space-4;
+}
+
+.hero__title {
+  @include a.style(display-medium);
+  margin-bottom: a.$space-3;
+}
+
+.hero__subtitle {
+  @include a.style(title-medium);
+  color: var(--md-sys-color-on-surface-variant);
+  margin-bottom: a.$space-6;
+}

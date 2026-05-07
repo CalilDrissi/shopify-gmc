@@ -1,0 +1,9 @@
+{{ define "content" }}
+<article class="c-card c-card--outlined" style="text-align:center; padding:48px 24px;">
+  <h1 class="hero__title" style="font-size: 96px; line-height: 1; margin-bottom:16px;">{{ .Status }}</h1>
+  <p class="hero__subtitle">{{ .Message }}</p>
+  <p style="margin-top:24px;">
+    <a href="/" class="c-button c-button--filled"><span class="c-button__label">Back home</span></a>
+  </p>
+</article>
+{{ end }}

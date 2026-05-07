@@ -1,0 +1,37 @@
+{{- /*
+  Component: tenant-switcher (Alpine dropdown)
+  Data shape:
+    Tenant      *store.Tenant                 - currently active tenant   (required)
+    Memberships []store.MembershipWithTenant  - all tenants for the user  (required)
+    CSRFToken   string                        - for switch form           (required)
+*/ -}}
+{{ define "tenant-switcher" -}}
+<div class="c-switcher" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+  <button type="button"
+          class="c-switcher__trigger"
+          @click="open = !open"
+          :aria-expanded="open"
+          aria-haspopup="menu">
+    <span class="c-pill c-pill--filled">{{ .Tenant.Name }}</span>
+    <span class="c-switcher__chevron" aria-hidden="true">▾</span>
+  </button>
+  <div class="c-switcher__menu"
+       role="menu"
+       x-show="open"
+       x-cloak
+       style="display:none">
+    <p class="c-switcher__heading">Switch workspace</p>
+    {{- range .Memberships }}
+    <form method="post" action="/account/switch/{{ .TenantID }}" role="menuitem">
+      <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+      <button type="submit" class="c-switcher__item{{ if .IsDefault }} is-active{{ end }}">
+        <span class="c-switcher__item-name">{{ .Name }}</span>
+        <span class="c-switcher__item-meta">{{ .Role }} · {{ .Plan }}</span>
+        {{- if .IsDefault }}<span class="c-switcher__check" aria-hidden="true">✓</span>{{ end -}}
+      </button>
+    </form>
+    {{- end }}
+    <a class="c-switcher__footer-link" href="/account">Account settings</a>
+  </div>
+</div>
+{{- end }}

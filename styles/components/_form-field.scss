@@ -1,0 +1,33 @@
+@use '../abstracts' as a;
+
+.c-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: a.$space-1;
+
+  &__label {
+    @include a.style(label-large);
+    color: var(--md-sys-color-on-surface);
+  }
+
+  &__required {
+    color: var(--md-sys-color-error);
+    margin-left: 2px;
+  }
+
+  &__hint {
+    @include a.style(body-small);
+    color: var(--md-sys-color-on-surface-variant);
+    margin-top: a.$space-1;
+  }
+
+  &__error {
+    @include a.style(body-small);
+    color: var(--md-sys-color-error);
+    margin-top: a.$space-1;
+  }
+
+  &--invalid {
+    .c-form-field__label { color: var(--md-sys-color-error); }
+  }
+}

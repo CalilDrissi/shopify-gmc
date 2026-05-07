@@ -1,0 +1,24 @@
+{{ define "content" }}
+<article class="c-card c-card--elevated">
+  <div class="c-card__header">
+    <h1 class="c-card__title">You're invited to {{ .Tenant.Name }}</h1>
+    <p class="c-card__subtitle">Role: {{ .Invitation.Role }} · expires {{ .ExpiresAt }}</p>
+  </div>
+  <div class="c-card__body">
+    {{ if .User }}
+      <p>You're signed in as <strong>{{ .User.Email }}</strong>. Accept to join the workspace.</p>
+      <form method="post" action="/invitations/{{ .TokenRaw }}/accept" style="margin-top:16px;">
+        <button type="submit" class="c-button c-button--filled">
+          <span class="c-button__label">Accept invitation</span>
+        </button>
+      </form>
+    {{ else }}
+      <p>Sign in or create an account using <strong>{{ .Invitation.Email }}</strong> to accept this invitation.</p>
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <a href="/login?invite={{ .TokenRaw }}" class="c-button c-button--filled"><span class="c-button__label">Sign in</span></a>
+        <a href="/signup?invite={{ .TokenRaw }}" class="c-button c-button--outlined"><span class="c-button__label">Sign up</span></a>
+      </div>
+    {{ end }}
+  </div>
+</article>
+{{ end }}

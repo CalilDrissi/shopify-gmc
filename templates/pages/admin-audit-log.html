@@ -1,0 +1,30 @@
+{{ define "content" }}
+<h1 class="page-title">Audit log</h1>
+<article class="c-card c-card--outlined">
+  <div class="c-card__body">
+    <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+      <thead>
+        <tr style="text-align:left; color:var(--md-sys-color-on-surface-variant);">
+          <th style="padding:8px 0;">When</th>
+          <th style="padding:8px 0;">Admin</th>
+          <th style="padding:8px 0;">Action</th>
+          <th style="padding:8px 0;">Target</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{- range .Data }}
+        <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
+          <td style="padding:8px 0;">{{ .CreatedAt.Format "2006-01-02 15:04:05" }}</td>
+          <td style="padding:8px 0;">{{ .AdminEmail }}</td>
+          <td style="padding:8px 0;"><code>{{ .Action }}</code></td>
+          <td style="padding:8px 0; color:var(--md-sys-color-on-surface-variant);">
+            {{ if .TargetType }}{{ .TargetType }}{{ end }}
+            {{ if .TargetID }}<code>{{ .TargetID }}</code>{{ end }}
+          </td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+  </div>
+</article>
+{{ end }}

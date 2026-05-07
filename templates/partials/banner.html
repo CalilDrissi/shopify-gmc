@@ -1,0 +1,29 @@
+{{- /*
+  Component: c-banner
+  Data shape:
+    Variant string         - info | warning | critical | success  (required)
+    Title   string                                                (optional)
+    Message string                                                (required)
+    Icon    string         - override default icon                (optional)
+    Action  template.HTML  - inline action area (e.g. button)     (optional)
+*/ -}}
+{{ define "banner" -}}
+{{- $role := "status" -}}
+{{- if eq .Variant "critical" }}{{ $role = "alert" }}{{ end -}}
+{{- $icon := .Icon -}}
+{{- if not $icon -}}
+  {{- if eq .Variant "info"     }}{{ $icon = "ℹ" }}
+  {{- else if eq .Variant "warning"  }}{{ $icon = "⚠" }}
+  {{- else if eq .Variant "critical" }}{{ $icon = "✕" }}
+  {{- else if eq .Variant "success"  }}{{ $icon = "✓" }}
+  {{- end -}}
+{{- end -}}
+<aside class="c-banner c-banner--{{ .Variant }}" role="{{ $role }}">
+  <span class="c-banner__icon" aria-hidden="true">{{ $icon }}</span>
+  <div class="c-banner__body">
+    {{- if .Title }}<p class="c-banner__title">{{ .Title }}</p>{{ end }}
+    <p class="c-banner__message">{{ .Message }}</p>
+  </div>
+  {{- if .Action }}<div class="c-banner__action">{{ .Action }}</div>{{ end }}
+</aside>
+{{- end }}

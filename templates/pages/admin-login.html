@@ -1,0 +1,15 @@
+{{ define "content" }}
+<article class="c-card c-card--elevated">
+  <div class="c-card__header">
+    <h1 class="c-card__title">Platform admin</h1>
+    <p class="c-card__subtitle">Two-factor required after sign-in.</p>
+  </div>
+  <form class="c-card__body" method="post" action="/admin/login" style="display:flex; flex-direction:column; gap:16px;">
+    {{ template "form-field" .Fields.Email }}
+    {{ template "form-field" .Fields.Password }}
+    <button type="submit" class="c-button c-button--filled c-button--full-width">
+      <span class="c-button__label">Continue</span>
+    </button>
+  </form>
+</article>
+{{ end }}

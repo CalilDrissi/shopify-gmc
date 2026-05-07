@@ -75,8 +75,11 @@ func SecurityHeaders(opts SecurityHeadersOptions) func(http.Handler) http.Handle
 	}
 }
 
+// Alpine.js evaluates inline expressions (e.g. `open = !open`) via Function(),
+// which needs 'unsafe-eval'. The alternative is Alpine's CSP-compliant build,
+// which forbids inline expressions and requires Alpine.data() registration.
 const defaultCSP = "default-src 'self'; " +
-	"script-src 'self' 'unsafe-inline'; " +
+	"script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
 	"style-src 'self' 'unsafe-inline'; " +
 	"img-src 'self' data: blob:; " +
 	"font-src 'self' data:; " +

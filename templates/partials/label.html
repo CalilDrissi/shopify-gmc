@@ -1,0 +1,15 @@
+{{- /*
+  Component: c-label
+  Data shape:
+    Text    string - label text                                  (required)
+    Size    string - medium | small (default large)              (optional)
+    Variant string - muted | error                               (optional)
+    For     string - associated input id; renders as <label>     (optional)
+*/ -}}
+{{ define "label" -}}
+{{- if .For -}}
+<label class="c-label{{ if .Size }} c-label--{{ .Size }}{{ end }}{{ if .Variant }} c-label--{{ .Variant }}{{ end }}" for="{{ .For }}">{{ .Text }}</label>
+{{- else -}}
+<span class="c-label{{ if .Size }} c-label--{{ .Size }}{{ end }}{{ if .Variant }} c-label--{{ .Variant }}{{ end }}">{{ .Text }}</span>
+{{- end -}}
+{{- end }}

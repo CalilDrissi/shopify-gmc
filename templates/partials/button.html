@@ -1,0 +1,26 @@
+{{- /*
+  Component: c-button
+  Data shape:
+    Label     string  - visible text                          (required)
+    Variant   string  - filled | tonal | outlined | text      (required)
+    Size      string  - small | large                         (optional, default medium)
+    Type      string  - button | submit | reset               (optional, default button)
+    Loading   bool    - shows spinner, freezes interactions   (optional)
+    Disabled  bool                                            (optional)
+    FullWidth bool    - stretches to container width          (optional)
+    Name      string  - HTML name attribute                   (optional)
+    Value     string  - HTML value attribute                  (optional)
+    HxPost    string  - htmx hx-post target (forward-compat)  (optional)
+*/ -}}
+{{ define "button" -}}
+<button
+  type="{{ if .Type }}{{ .Type }}{{ else }}button{{ end }}"
+  class="c-button c-button--{{ .Variant }}{{ if .Size }} c-button--{{ .Size }}{{ end }}{{ if .FullWidth }} c-button--full-width{{ end }}{{ if .Loading }} is-loading{{ end }}"
+  {{- if .Disabled }} disabled aria-disabled="true"{{ end -}}
+  {{- if .Name }} name="{{ .Name }}"{{ end -}}
+  {{- if .Value }} value="{{ .Value }}"{{ end -}}
+  {{- if .HxPost }} hx-post="{{ .HxPost }}"{{ end }}>
+  <span class="c-button__label">{{ .Label }}</span>
+  {{- if .Loading }}<span class="c-button__spinner" aria-hidden="true"></span>{{ end -}}
+</button>
+{{- end }}

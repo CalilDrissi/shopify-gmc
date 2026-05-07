@@ -31,13 +31,26 @@ func RequireUser(cm *auth.CookieManager, sessions *auth.SessionStore, users User
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
-			user, err := users.FindUser(r.Context(), sess.UserID)
+			// When the session is an impersonation, the effective user is the
+			// impersonated target — but we still expose the admin's identity
+			// via WithImpersonator so the banner / audit can show "viewing as X
+			// on behalf of Y".
+			effectiveID := sess.UserID
+			if sess.ImpersonatingUserID != nil {
+				effectiveID = *sess.ImpersonatingUserID
+			}
+			user, err := users.FindUser(r.Context(), effectiveID)
 			if err != nil {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
 			ctx := auth.WithSession(r.Context(), sess)
 			ctx = auth.WithUser(ctx, user)
+			if sess.ImpersonatingUserID != nil {
+				if admin, err := users.FindUser(r.Context(), sess.UserID); err == nil {
+					ctx = WithImpersonator(ctx, admin)
+				}
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

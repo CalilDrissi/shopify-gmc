@@ -63,3 +63,16 @@ func (m *MemSessionDB) Revoke(_ context.Context, id uuid.UUID, at time.Time) err
 	row.RevokedAt = &at
 	return nil
 }
+
+func (m *MemSessionDB) SetImpersonation(_ context.Context, id uuid.UUID, userID, tenantID, logID *uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	row, ok := m.byID[id]
+	if !ok {
+		return ErrSessionNotFound
+	}
+	row.ImpersonatingUserID = userID
+	row.ImpersonatingTenantID = tenantID
+	row.ImpersonationLogID = logID
+	return nil
+}

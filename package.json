@@ -7,6 +7,9 @@
     "watch": "sass --watch styles/main.scss:static/css/main.css"
   },
   "devDependencies": {
+    "alpinejs": "^3.15.12",
+    "otplib": "^12.0.1",
+    "playwright": "^1.59.1",
     "sass": "^1.81.0"
   }
 }

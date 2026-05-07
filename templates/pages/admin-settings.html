@@ -1,0 +1,39 @@
+{{ define "content" }}
+<h1 class="page-title">Platform settings</h1>
+<article class="c-card c-card--elevated">
+  <div class="c-card__header">
+    <h2 class="c-card__title">AI provider</h2>
+    <p class="c-card__subtitle">Stored encrypted with AES-256-GCM. The API key is write-only — only the last 4 characters are shown after save.</p>
+  </div>
+  <form class="c-card__body" method="post" action="/admin/settings" style="display:flex; flex-direction:column; gap:16px;">
+    <input type="hidden" name="_csrf" value="{{ .CSRFToken }}">
+    <div class="c-form-field">
+      <label class="c-form-field__label" for="preset">Provider preset</label>
+      <select id="preset" name="preset" class="c-input">
+        <option value="">— pick a preset —</option>
+        <option value="anthropic">Anthropic Claude</option>
+        <option value="openai">OpenAI</option>
+      </select>
+    </div>
+    {{- range .Data }}
+    {{ if eq .Key "ai_api_key" }}
+    <div class="c-form-field">
+      <label class="c-form-field__label" for="{{ .Key }}">API key</label>
+      <input id="{{ .Key }}" class="c-input c-input--password" type="password" name="{{ .Key }}" placeholder="{{ if .Set }}{{ .Display }}{{ else }}(unset){{ end }}" autocomplete="off">
+      {{ if .Set }}<p class="c-form-field__hint">Currently: {{ .Display }} ({{ .Source }})</p>{{ end }}
+    </div>
+    {{ else }}
+    <div class="c-form-field">
+      <label class="c-form-field__label" for="{{ .Key }}">{{ .Description }}</label>
+      <input id="{{ .Key }}" class="c-input c-input--text" type="text" name="{{ .Key }}" value="{{ if .Set }}{{ .Display }}{{ end }}">
+      {{ if .Set }}<p class="c-form-field__hint">Source: {{ .Source }}</p>{{ end }}
+    </div>
+    {{ end }}
+    {{- end }}
+    <div style="display:flex; gap:12px;">
+      <button type="submit" class="c-button c-button--filled"><span class="c-button__label">Save</span></button>
+      <a href="/admin/settings/test-connection" class="c-button c-button--outlined"><span class="c-button__label">Test connection</span></a>
+    </div>
+  </form>
+</article>
+{{ end }}

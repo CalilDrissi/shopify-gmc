@@ -1,0 +1,16 @@
+{{ define "content" }}
+<h1 class="page-title">Dashboard</h1>
+<article class="c-card c-card--elevated">
+  <div class="c-card__header">
+    <h2 class="c-card__title">Welcome, {{ .User.Email }}</h2>
+    <p class="c-card__subtitle">{{ .Tenant.Name }} · {{ .Tenant.Plan }} plan</p>
+  </div>
+  <div class="c-card__body">
+    <p>This is a placeholder dashboard. Connect a Shopify store to start auditing.</p>
+    <p style="margin-top:16px;">
+      <span class="c-pill c-pill--success">✓ Email verified</span>
+      <span class="c-pill c-pill--filled">Owner</span>
+    </p>
+  </div>
+</article>
+{{ end }}

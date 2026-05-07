@@ -1,0 +1,78 @@
+{{ define "components" }}<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Components — gmcauditor</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <style>
+    /* Page chrome only — not part of the design system */
+    body { padding: 32px; max-width: 1100px; margin: 0 auto; background: var(--md-sys-color-background); }
+    h1, h2, h3 { color: var(--md-sys-color-on-background); }
+    h1 { margin-bottom: 8px; }
+    .page-subtitle { color: var(--md-sys-color-on-surface-variant); margin-bottom: 32px; }
+    section { margin-bottom: 48px; }
+    section > h2 { padding-bottom: 8px; border-bottom: 1px solid var(--md-sys-color-outline-variant); margin-bottom: 16px; }
+    section h3 { margin: 16px 0 8px; color: var(--md-sys-color-on-surface-variant); font-weight: 500; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    .grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .stack { display: flex; flex-direction: column; gap: 16px; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .form-stack { display: flex; flex-direction: column; gap: 16px; max-width: 420px; }
+  </style>
+</head>
+<body>
+  <h1>gmcauditor components</h1>
+  <p class="page-subtitle">Material Design 3 tokens, BEM partials, no JavaScript.</p>
+
+  <section>
+    <h2>Button</h2>
+
+    <h3>Variants</h3>
+    <div class="grid">{{ range .Buttons.Variants }}{{ template "button" . }}{{ end }}</div>
+
+    <h3>Sizes</h3>
+    <div class="grid">{{ range .Buttons.Sizes }}{{ template "button" . }}{{ end }}</div>
+
+    <h3>States</h3>
+    <div class="grid">{{ range .Buttons.States }}{{ template "button" . }}{{ end }}</div>
+
+    <h3>Full width</h3>
+    {{ template "button" .Buttons.FullWidth }}
+  </section>
+
+  <section>
+    <h2>Banner</h2>
+    <div class="stack">{{ range .Banners }}{{ template "banner" . }}{{ end }}</div>
+  </section>
+
+  <section>
+    <h2>Card</h2>
+    <div class="card-grid">{{ range .Cards }}{{ template "card" . }}{{ end }}</div>
+  </section>
+
+  <section>
+    <h2>Form field</h2>
+    <div class="form-stack">{{ range .FormFields }}{{ template "form-field" . }}{{ end }}</div>
+  </section>
+
+  <section>
+    <h2>Input</h2>
+    <div class="form-stack">{{ range .Inputs }}{{ template "input" . }}{{ end }}</div>
+  </section>
+
+  <section>
+    <h2>Label</h2>
+    <div class="grid">{{ range .Labels }}{{ template "label" . }}{{ end }}</div>
+  </section>
+
+  <section>
+    <h2>Badge</h2>
+    <div class="grid">{{ range .Badges }}{{ template "badge" . }}{{ end }}</div>
+  </section>
+
+  <section>
+    <h2>Pill</h2>
+    <div class="grid">{{ range .Pills }}{{ template "pill" . }}{{ end }}</div>
+  </section>
+</body>
+</html>{{ end }}

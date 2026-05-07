@@ -1,0 +1,24 @@
+{{ define "content" }}
+<section class="hero">
+  <h1 class="hero__title">Audit your Shopify store against Google Merchant Center</h1>
+  <p class="hero__subtitle">Find compliance issues before they cost you traffic. AI-suggested fixes for every flagged product.</p>
+  <div style="display:flex; gap:12px; justify-content:center;">
+    <a href="/signup" class="c-button c-button--filled c-button--large"><span class="c-button__label">Start free audit</span></a>
+    <a href="/features" class="c-button c-button--outlined c-button--large"><span class="c-button__label">See features</span></a>
+  </div>
+</section>
+
+<article class="c-card c-card--outlined">
+  <div class="c-card__header">
+    <h2 class="c-card__title">Free teaser audit</h2>
+    <p class="c-card__subtitle">Drop in any public Shopify domain. We'll spot-check 5 products.</p>
+  </div>
+  <form class="c-card__body" method="post" action="/audit/teaser" style="display:flex; gap:12px; align-items:flex-end;">
+    <div class="c-form-field" style="flex:1;">
+      <label class="c-form-field__label" for="teaser-domain">Shopify domain</label>
+      <input class="c-input c-input--text" type="text" id="teaser-domain" name="domain" placeholder="acme-electronics.myshopify.com" required>
+    </div>
+    <button type="submit" class="c-button c-button--filled"><span class="c-button__label">Run teaser</span></button>
+  </form>
+</article>
+{{ end }}

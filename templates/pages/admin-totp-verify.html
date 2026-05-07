@@ -1,0 +1,14 @@
+{{ define "content" }}
+<article class="c-card c-card--elevated">
+  <div class="c-card__header">
+    <h1 class="c-card__title">Two-factor required</h1>
+    <p class="c-card__subtitle">Enter the 6-digit code from your authenticator.</p>
+  </div>
+  <form class="c-card__body" method="post" action="/admin/totp/verify" style="display:flex; flex-direction:column; gap:16px;">
+    {{ template "form-field" .Fields.Code }}
+    <button type="submit" class="c-button c-button--filled c-button--full-width">
+      <span class="c-button__label">Verify</span>
+    </button>
+  </form>
+</article>
+{{ end }}

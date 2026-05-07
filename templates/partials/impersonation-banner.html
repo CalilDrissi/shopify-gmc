@@ -1,0 +1,22 @@
+{{- /*
+  Component: impersonation-banner
+  Data shape:
+    Impersonator auth.User  - the admin doing the impersonation (required)
+    User         *store.User - the target user being impersonated (required)
+    Tenant       *store.Tenant - the tenant being viewed         (required)
+    CSRFToken    string                                          (required)
+*/ -}}
+{{ define "impersonation-banner" -}}
+<aside class="c-impersonation" role="alert">
+  <div class="c-impersonation__body">
+    <strong>Impersonation active.</strong>
+    {{ .Impersonator.Email }} is viewing as {{ .User.Email }} ({{ .Tenant.Name }}). Destructive writes are blocked.
+  </div>
+  <form method="post" action="/admin/impersonation/stop">
+    <input type="hidden" name="_csrf" value="{{ .CSRFToken }}">
+    <button type="submit" class="c-button c-button--filled c-button--small">
+      <span class="c-button__label">Stop impersonating</span>
+    </button>
+  </form>
+</aside>
+{{- end }}

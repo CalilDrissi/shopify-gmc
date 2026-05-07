@@ -1,0 +1,34 @@
+{{- /*
+  Component: c-input
+  Data shape:
+    Type         string - text | email | password | number | url  (required)
+    Name         string                                           (required)
+    ID           string - DOM id, used by form-field label        (optional)
+    Value        string                                           (optional)
+    Placeholder  string                                           (optional)
+    Required     bool                                             (optional)
+    Disabled     bool                                             (optional)
+    ReadOnly     bool                                             (optional)
+    Invalid      bool   - styles input as invalid                 (optional)
+    Autocomplete string - HTML autocomplete attribute             (optional)
+    Min          string - for number inputs                       (optional)
+    Max          string - for number inputs                       (optional)
+    Step         string - for number inputs                       (optional)
+*/ -}}
+{{ define "input" -}}
+<input
+  class="c-input c-input--{{ .Type }}{{ if .Invalid }} c-input--invalid{{ end }}"
+  type="{{ .Type }}"
+  name="{{ .Name }}"
+  {{- if .ID }} id="{{ .ID }}"{{ end -}}
+  {{- if .Value }} value="{{ .Value }}"{{ end -}}
+  {{- if .Placeholder }} placeholder="{{ .Placeholder }}"{{ end -}}
+  {{- if .Required }} required aria-required="true"{{ end -}}
+  {{- if .Invalid }} aria-invalid="true"{{ end -}}
+  {{- if .Disabled }} disabled{{ end -}}
+  {{- if .ReadOnly }} readonly{{ end -}}
+  {{- if .Autocomplete }} autocomplete="{{ .Autocomplete }}"{{ end -}}
+  {{- if .Min }} min="{{ .Min }}"{{ end -}}
+  {{- if .Max }} max="{{ .Max }}"{{ end -}}
+  {{- if .Step }} step="{{ .Step }}"{{ end }}>
+{{- end }}

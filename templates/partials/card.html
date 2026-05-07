@@ -1,0 +1,23 @@
+{{- /*
+  Component: c-card
+  Data shape:
+    Modifier string         - elevated | filled | outlined  (required)
+    Title    string         - header title                  (optional)
+    Subtitle string         - header subtitle               (optional)
+    Body     template.HTML  - body HTML                     (required)
+    Footer   template.HTML  - footer HTML (often buttons)   (optional)
+*/ -}}
+{{ define "card" -}}
+<article class="c-card c-card--{{ .Modifier }}">
+  {{- if or .Title .Subtitle }}
+  <header class="c-card__header">
+    {{- if .Title }}<h3 class="c-card__title">{{ .Title }}</h3>{{ end }}
+    {{- if .Subtitle }}<p class="c-card__subtitle">{{ .Subtitle }}</p>{{ end }}
+  </header>
+  {{- end }}
+  <div class="c-card__body">{{ .Body }}</div>
+  {{- if .Footer }}
+  <footer class="c-card__footer">{{ .Footer }}</footer>
+  {{- end }}
+</article>
+{{- end }}

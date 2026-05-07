@@ -1,0 +1,13 @@
+{{- /*
+  Component: c-pill
+  Data shape:
+    Label   string - pill text                                                (required)
+    Variant string - filled | outlined | success | warning | critical         (required)
+    Icon    string - leading glyph                                            (optional)
+*/ -}}
+{{ define "pill" -}}
+<span class="c-pill c-pill--{{ .Variant }}">
+  {{- if .Icon }}<span class="c-pill__icon" aria-hidden="true">{{ .Icon }}</span>{{ end -}}
+  {{- .Label -}}
+</span>
+{{- end }}

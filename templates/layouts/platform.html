@@ -1,0 +1,42 @@
+{{ define "layout-platform" -}}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ if .Title }}{{ .Title }} · {{ end }}Platform admin</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="l-platform">
+  <header class="l-platform__topbar">
+    <div class="l-platform__topbar-inner">
+      <a class="l-platform__brand" href="/admin">gmcauditor · platform</a>
+      <nav class="l-platform__user">
+        <span>{{ if .Admin }}{{ .Admin.Email }}{{ end }}</span>
+        <form method="post" action="/admin/logout" style="display:inline;">
+          <button type="submit" class="c-button c-button--text c-button--small">Sign out</button>
+        </form>
+      </nav>
+    </div>
+  </header>
+  <div class="l-platform__shell">
+    <aside class="l-platform__sidebar">
+      <nav>
+        <a href="/admin">Dashboard</a>
+        <a href="/admin/tenants">Tenants</a>
+        <a href="/admin/users">Users</a>
+        <a href="/admin/audits">Audits</a>
+        <a href="/admin/jobs">Jobs</a>
+        <a href="/admin/admins">Admins</a>
+        <a href="/admin/audit-log">Audit log</a>
+        {{ if and .Admin (eq .Admin.Role "super") }}<a href="/admin/settings">Settings</a>{{ end }}
+      </nav>
+    </aside>
+    <main class="l-platform__main">
+      {{ if .Flash }}{{ template "banner" .Flash }}{{ end }}
+      {{ template "content" . }}
+    </main>
+  </div>
+</body>
+</html>
+{{- end }}

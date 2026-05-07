@@ -1,0 +1,12 @@
+@use '../abstracts' as a;
+
+.c-label {
+  display: inline-block;
+  color: var(--md-sys-color-on-surface);
+  @include a.style(label-large);
+
+  &--medium { @include a.style(label-medium); }
+  &--small  { @include a.style(label-small);  }
+  &--muted  { color: var(--md-sys-color-on-surface-variant); }
+  &--error  { color: var(--md-sys-color-error); }
+}

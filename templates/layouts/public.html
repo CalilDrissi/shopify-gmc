@@ -1,0 +1,41 @@
+{{ define "layout-public" -}}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ if .Title }}{{ .Title }} · {{ end }}gmcauditor</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="l-public">
+  <header class="l-public__topbar">
+    <div class="l-public__topbar-inner">
+      <a class="l-public__brand" href="/">gmcauditor</a>
+      <nav class="l-public__nav">
+        <a href="/features">Features</a>
+        <a href="/pricing">Pricing</a>
+        {{ if .User }}
+          <a href="/t/{{ .User.DefaultSlug }}">Dashboard</a>
+        {{ else }}
+          <a href="/login">Sign in</a>
+          <a href="/signup" class="l-public__nav-cta">Sign up</a>
+        {{ end }}
+      </nav>
+    </div>
+  </header>
+  <main class="l-public__main">
+    {{ if .Flash }}
+      {{ template "banner" .Flash }}
+    {{ end }}
+    {{ template "content" . }}
+  </main>
+  <footer class="l-public__footer">
+    <span>&copy; gmcauditor</span>
+    <nav>
+      <a href="/features">Features</a>
+      <a href="/pricing">Pricing</a>
+    </nav>
+  </footer>
+</body>
+</html>
+{{- end }}
