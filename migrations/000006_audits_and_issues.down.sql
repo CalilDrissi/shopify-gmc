@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS audit_diffs;
+DROP TABLE IF EXISTS issues;
+DROP TABLE IF EXISTS audits;

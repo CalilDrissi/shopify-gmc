@@ -1,0 +1,14 @@
+DROP TYPE IF EXISTS platform_admin_role;
+DROP TYPE IF EXISTS email_token_kind;
+DROP TYPE IF EXISTS purchase_status;
+DROP TYPE IF EXISTS job_status;
+DROP TYPE IF EXISTS alert_channel;
+DROP TYPE IF EXISTS gmc_connection_status;
+DROP TYPE IF EXISTS issue_status;
+DROP TYPE IF EXISTS issue_severity;
+DROP TYPE IF EXISTS audit_status;
+DROP TYPE IF EXISTS store_status;
+DROP TYPE IF EXISTS invitation_status;
+DROP TYPE IF EXISTS membership_role;
+DROP TYPE IF EXISTS plan_tier;
+DROP TYPE IF EXISTS tenant_kind;

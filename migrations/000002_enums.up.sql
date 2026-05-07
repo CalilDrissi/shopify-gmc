@@ -1,0 +1,14 @@
+CREATE TYPE tenant_kind           AS ENUM ('individual', 'agency');
+CREATE TYPE plan_tier             AS ENUM ('free', 'pro', 'agency', 'enterprise');
+CREATE TYPE membership_role       AS ENUM ('owner', 'member');
+CREATE TYPE invitation_status     AS ENUM ('pending', 'accepted', 'revoked', 'expired');
+CREATE TYPE store_status          AS ENUM ('connected', 'disconnected', 'error', 'paused');
+CREATE TYPE audit_status          AS ENUM ('queued', 'running', 'succeeded', 'failed', 'canceled');
+CREATE TYPE issue_severity        AS ENUM ('critical', 'error', 'warning', 'info');
+CREATE TYPE issue_status          AS ENUM ('open', 'ignored', 'fixed');
+CREATE TYPE gmc_connection_status AS ENUM ('active', 'expired', 'revoked', 'error');
+CREATE TYPE alert_channel         AS ENUM ('email', 'webhook', 'slack');
+CREATE TYPE job_status            AS ENUM ('queued', 'running', 'succeeded', 'failed', 'dead');
+CREATE TYPE purchase_status       AS ENUM ('active', 'refunded', 'canceled');
+CREATE TYPE email_token_kind      AS ENUM ('verify_email', 'password_reset', 'email_change');
+CREATE TYPE platform_admin_role   AS ENUM ('support', 'admin', 'super');
