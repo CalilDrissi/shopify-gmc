@@ -1,0 +1,46 @@
+@use '../abstracts/colors'       as c;
+@use '../abstracts/typography'   as t;
+@use '../abstracts/elevation'    as e;
+@use '../abstracts/state-layers' as sl;
+@use '../abstracts/shape'        as sh;
+
+:root {
+  color-scheme: light dark;
+
+  @include c.emit(c.$light);
+  @include t.emit-vars;
+
+  --md-sys-elevation-0: #{e.$level-0};
+  --md-sys-elevation-1: #{e.$level-1};
+  --md-sys-elevation-2: #{e.$level-2};
+  --md-sys-elevation-3: #{e.$level-3};
+  --md-sys-elevation-4: #{e.$level-4};
+  --md-sys-elevation-5: #{e.$level-5};
+
+  --md-sys-state-hover-opacity:   #{sl.$hover};
+  --md-sys-state-focus-opacity:   #{sl.$focus};
+  --md-sys-state-pressed-opacity: #{sl.$pressed};
+  --md-sys-state-dragged-opacity: #{sl.$dragged};
+
+  --md-sys-shape-none:        #{sh.$none};
+  --md-sys-shape-extra-small: #{sh.$xs};
+  --md-sys-shape-small:       #{sh.$sm};
+  --md-sys-shape-medium:      #{sh.$md};
+  --md-sys-shape-large:       #{sh.$lg};
+  --md-sys-shape-extra-large: #{sh.$xl};
+  --md-sys-shape-full:        #{sh.$full};
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    @include c.emit(c.$dark);
+  }
+}
+
+[data-theme='light'] {
+  @include c.emit(c.$light);
+}
+
+[data-theme='dark'] {
+  @include c.emit(c.$dark);
+}

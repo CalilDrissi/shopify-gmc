@@ -1,0 +1,12 @@
+{
+  "name": "gmcauditor-styles",
+  "private": true,
+  "description": "Sass build pipeline for gmcauditor",
+  "scripts": {
+    "build": "sass --no-source-map --style=compressed styles/main.scss:static/css/main.css",
+    "watch": "sass --watch styles/main.scss:static/css/main.css"
+  },
+  "devDependencies": {
+    "sass": "^1.81.0"
+  }
+}

@@ -1,0 +1,17 @@
+$none: 0;
+$xs:   4px;
+$sm:   8px;
+$md:   12px;
+$lg:   16px;
+$xl:   28px;
+$full: 9999px;
+
+$shapes: (
+  'none':        $none,
+  'extra-small': $xs,
+  'small':       $sm,
+  'medium':      $md,
+  'large':       $lg,
+  'extra-large': $xl,
+  'full':        $full,
+);

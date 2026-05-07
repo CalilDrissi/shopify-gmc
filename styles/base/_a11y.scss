@@ -1,0 +1,48 @@
+@use '../abstracts/mixins' as m;
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.visually-hidden {
+  @include m.visually-hidden;
+}
+
+.skip-link {
+  @include m.visually-hidden;
+
+  &:focus,
+  &:focus-visible {
+    position: fixed !important;
+    top: 1rem;
+    left: 1rem;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    clip: auto;
+    overflow: visible;
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    border-radius: var(--md-sys-shape-small);
+    z-index: 1000;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--md-sys-shape-extra-small);
+}
+
+::selection {
+  background-color: var(--md-sys-color-primary-container);
+  color:            var(--md-sys-color-on-primary-container);
+}

@@ -1,0 +1,11 @@
+$hover:   0.08;
+$focus:   0.10;
+$pressed: 0.10;
+$dragged: 0.16;
+
+$opacities: (
+  'hover':   $hover,
+  'focus':   $focus,
+  'pressed': $pressed,
+  'dragged': $dragged,
+);

@@ -1,0 +1,46 @@
+@use 'sass:map';
+
+$plain-font: ('Inter', 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+$brand-font: ('Inter', 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+
+$scale: (
+  display-large:   (size: 57px, line: 64px, weight: 400, tracking: -0.25px, family: brand),
+  display-medium:  (size: 45px, line: 52px, weight: 400, tracking:  0,      family: brand),
+  display-small:   (size: 36px, line: 44px, weight: 400, tracking:  0,      family: brand),
+  headline-large:  (size: 32px, line: 40px, weight: 400, tracking:  0,      family: brand),
+  headline-medium: (size: 28px, line: 36px, weight: 400, tracking:  0,      family: brand),
+  headline-small:  (size: 24px, line: 32px, weight: 400, tracking:  0,      family: brand),
+  title-large:     (size: 22px, line: 28px, weight: 400, tracking:  0,      family: brand),
+  title-medium:    (size: 16px, line: 24px, weight: 500, tracking:  0.15px, family: plain),
+  title-small:     (size: 14px, line: 20px, weight: 500, tracking:  0.1px,  family: plain),
+  body-large:      (size: 16px, line: 24px, weight: 400, tracking:  0.5px,  family: plain),
+  body-medium:     (size: 14px, line: 20px, weight: 400, tracking:  0.25px, family: plain),
+  body-small:      (size: 12px, line: 16px, weight: 400, tracking:  0.4px,  family: plain),
+  label-large:     (size: 14px, line: 20px, weight: 500, tracking:  0.1px,  family: plain),
+  label-medium:    (size: 12px, line: 16px, weight: 500, tracking:  0.5px,  family: plain),
+  label-small:     (size: 11px, line: 16px, weight: 500, tracking:  0.5px,  family: plain),
+);
+
+@mixin style($name) {
+  $config: map.get($scale, $name);
+  @if not $config {
+    @error "Unknown type style `#{$name}`. Available: #{map.keys($scale)}.";
+  }
+  font-family:    var(--md-sys-typescale-#{map.get($config, family)}-font);
+  font-size:      map.get($config, size);
+  line-height:    map.get($config, line);
+  font-weight:    map.get($config, weight);
+  letter-spacing: map.get($config, tracking);
+}
+
+@mixin emit-vars {
+  --md-sys-typescale-plain-font: #{$plain-font};
+  --md-sys-typescale-brand-font: #{$brand-font};
+
+  @each $name, $config in $scale {
+    --md-sys-typescale-#{$name}-size:        #{map.get($config, size)};
+    --md-sys-typescale-#{$name}-line-height: #{map.get($config, line)};
+    --md-sys-typescale-#{$name}-weight:      #{map.get($config, weight)};
+    --md-sys-typescale-#{$name}-tracking:    #{map.get($config, tracking)};
+  }
+}

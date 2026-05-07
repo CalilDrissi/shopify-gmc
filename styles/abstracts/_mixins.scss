@@ -1,0 +1,74 @@
+@use 'sass:map';
+@use 'breakpoints';
+@use 'spacing';
+
+@mixin focus-ring($offset: 2px, $width: 2px, $color: var(--md-sys-color-primary)) {
+  &:focus-visible {
+    outline: $width solid $color;
+    outline-offset: $offset;
+  }
+}
+
+@mixin visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@mixin breakpoint-up($name) {
+  @media (min-width: #{breakpoints.get($name)}) {
+    @content;
+  }
+}
+
+@mixin truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin surface($level: 0) {
+  background-color: var(--md-sys-color-surface);
+  color:            var(--md-sys-color-on-surface);
+  box-shadow:       var(--md-sys-elevation-#{$level});
+}
+
+@mixin state-layer($color: var(--md-sys-color-on-surface)) {
+  position: relative;
+  isolation: isolate;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: $color;
+    opacity: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    transition: opacity 120ms ease;
+  }
+
+  &:hover::after         { opacity: var(--md-sys-state-hover-opacity); }
+  &:focus-visible::after { opacity: var(--md-sys-state-focus-opacity); }
+  &:active::after        { opacity: var(--md-sys-state-pressed-opacity); }
+}
+
+@mixin stack($gap: spacing.$space-4) {
+  display: flex;
+  flex-direction: column;
+  gap: $gap;
+}
+
+@mixin inline($gap: spacing.$space-2, $align: center, $justify: flex-start) {
+  display: flex;
+  flex-direction: row;
+  align-items: $align;
+  justify-content: $justify;
+  gap: $gap;
+}

@@ -1,4 +1,4 @@
-.PHONY: help build run worker scheduler seed migrate test fmt vet lint tidy migrate-up migrate-down migrate-version migrate-cycle sass-build sass-watch docker-up docker-down clean
+.PHONY: help build run worker scheduler seed migrate test fmt vet lint tidy migrate-up migrate-down migrate-version migrate-cycle dev-css build-css node_modules docker-up docker-down clean
 
 GO        := go
 BIN_DIR   := bin
@@ -8,7 +8,7 @@ SCHEDULER := $(BIN_DIR)/scheduler
 SEED      := $(BIN_DIR)/seed
 MIGRATE   := $(BIN_DIR)/migrate
 
-include .env
+-include .env
 export
 
 help: ## Show available targets
@@ -66,11 +66,15 @@ migrate-cycle: ## Verify migrations: up, then down to zero, then up again
 	$(GO) run ./cmd/migrate down
 	$(GO) run ./cmd/migrate up
 
-sass-build: ## Compile Sass once
-	sass styles/main.scss:static/css/main.css --style=compressed --no-source-map
+node_modules: package.json
+	npm install --no-audit --no-fund
+	@touch node_modules
 
-sass-watch: ## Watch Sass and recompile on change
-	sass --watch styles/main.scss:static/css/main.css
+dev-css: node_modules ## Watch Sass and recompile to static/css/main.css
+	npx sass --watch styles/main.scss:static/css/main.css
+
+build-css: node_modules ## Compile compressed Sass to static/css/main.css (consumed by go:embed)
+	npx sass --no-source-map --style=compressed styles/main.scss:static/css/main.css
 
 docker-up: ## Start Postgres and Mailhog
 	docker compose up -d
@@ -79,4 +83,4 @@ docker-down: ## Stop docker services
 	docker compose down
 
 clean: ## Remove build artifacts
-	rm -rf $(BIN_DIR) static/css/main.css static/css/main.css.map
+	rm -rf $(BIN_DIR) static/css/main.css static/css/main.css.map node_modules

@@ -1,0 +1,31 @@
+@use '../abstracts/typography' as t;
+
+body {
+  font-family: var(--md-sys-typescale-plain-font);
+  color:       var(--md-sys-color-on-background);
+  background-color: var(--md-sys-color-background);
+  @include t.style(body-medium);
+}
+
+h1 { @include t.style(headline-large);  }
+h2 { @include t.style(headline-medium); }
+h3 { @include t.style(headline-small);  }
+h4 { @include t.style(title-large);     }
+h5 { @include t.style(title-medium);    }
+h6 { @include t.style(title-small);     }
+
+p     { @include t.style(body-medium); }
+small { @include t.style(body-small);  }
+
+label,
+.label {
+  @include t.style(label-medium);
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.92em;
+}
