@@ -1,0 +1,5 @@
+# Allow the deploy user to run the mailbox helper as root without a
+# password. The mailbox script is the only entry — no shell escape.
+# Install with `visudo -cf` then `cp` to /etc/sudoers.d/mailbox (mode 0440).
+deploy ALL=(root) NOPASSWD: /usr/local/bin/mailbox
+Defaults:deploy !requiretty

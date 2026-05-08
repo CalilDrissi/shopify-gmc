@@ -159,6 +159,7 @@ func main() {
 		{Name: "admin-audit-log", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-audit-log.html"},
 		{Name: "admin-settings", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-settings.html"},
 		{Name: "admin-gmc", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-gmc.html"},
+		{Name: "admin-mail", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail.html"},
 	}
 	if err := rend.Register(pages); err != nil {
 		log.Fatalf("register pages: %v", err)
@@ -377,6 +378,12 @@ func main() {
 	mux.HandleFunc("POST /admin/impersonation/stop", adminH.ImpersonationStop)
 	mux.HandleFunc("GET /admin/audit-log", adminH.AuditLogPage)
 	mux.HandleFunc("GET /admin/gmc", adminH.GMCPage)
+	mux.HandleFunc("GET /admin/mail", adminH.MailPage)
+	mux.HandleFunc("POST /admin/mail/add", adminH.MailAdd)
+	mux.HandleFunc("POST /admin/mail/passwd", adminH.MailPasswd)
+	mux.HandleFunc("POST /admin/mail/del", adminH.MailDel)
+	mux.HandleFunc("POST /admin/mail/alias", adminH.MailAlias)
+	mux.HandleFunc("POST /admin/mail/unalias", adminH.MailUnalias)
 	mux.HandleFunc("GET /admin/settings", adminH.SettingsPage)
 	mux.HandleFunc("POST /admin/settings", adminH.SettingsSave)
 	mux.HandleFunc("GET /admin/settings/test-connection", adminH.SettingsTestConnection)

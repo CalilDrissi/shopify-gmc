@@ -1,0 +1,157 @@
+{{ define "content" }}
+{{ with .Data }}
+<header style="display:flex; align-items:baseline; justify-content:space-between; gap:16px;">
+  <h1 class="page-title" style="margin:0;">Mail</h1>
+  {{- if not .Configured }}
+  <p style="color:var(--md-sys-color-on-surface-variant); margin:0;">Mail server not configured on this host (no <code>/usr/local/bin/mailbox</code>).</p>
+  {{- end }}
+</header>
+
+{{- if .Result }}
+{{- with .Result }}
+<article class="c-card c-card--elevated" style="margin-top:16px; border-left:4px solid {{ if eq .Kind `error` }}#b3261e{{ else }}#1b873f{{ end }};">
+  <div class="c-card__body">
+    {{- if eq .Kind "error" }}
+    <strong style="color:#b3261e;">Error:</strong> {{ .Payload }}
+    {{- else if eq .Kind "added" }}
+    <strong>Mailbox created:</strong> <code>{{ .Email }}</code>
+    {{- if .Right }}
+    <p style="margin:8px 0 0;">Generated password — <strong>copy now, not retrievable later</strong>:</p>
+    <p><code style="font-size:1.1rem; padding:6px 10px; background:var(--md-sys-color-surface-container-highest); border-radius:6px;">{{ .Right }}</code></p>
+    {{- end }}
+    {{- else if eq .Kind "passwd" }}
+    <strong>Password rotated</strong> for <code>{{ .Email }}</code>.
+    {{- if .Right }}
+    <p style="margin:8px 0 0;">New password — <strong>copy now, not retrievable later</strong>:</p>
+    <p><code style="font-size:1.1rem; padding:6px 10px; background:var(--md-sys-color-surface-container-highest); border-radius:6px;">{{ .Right }}</code></p>
+    {{- end }}
+    {{- else if eq .Kind "deleted" }}
+    Mailbox <code>{{ .Email }}</code> deleted.
+    {{- else if eq .Kind "alias" }}
+    Alias <code>{{ .Email }}</code> → <code>{{ .Right }}</code> created.
+    {{- else if eq .Kind "unalias" }}
+    Alias for <code>{{ .Email }}</code> removed.
+    {{- end }}
+  </div>
+</article>
+{{- end }}
+{{- end }}
+
+{{- if .Error }}
+<article class="c-card c-card--outlined" style="margin-top:16px; border-color:#b3261e;">
+  <div class="c-card__body"><strong style="color:#b3261e;">Couldn't read mail config:</strong> {{ .Error }}</div>
+</article>
+{{- end }}
+
+<section style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px;">
+  <article class="c-card c-card--outlined">
+    <div class="c-card__header"><h2 class="c-card__title">Add mailbox</h2></div>
+    <div class="c-card__body">
+      <form method="post" action="/admin/mail/add" style="display:flex; flex-direction:column; gap:8px;">
+        <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+        <label>
+          <span style="display:block; font-size:0.875rem; color:var(--md-sys-color-on-surface-variant);">Email</span>
+          <input type="email" name="email" required placeholder="support@shopifygmc.com" style="width:100%; padding:8px;">
+        </label>
+        <label>
+          <span style="display:block; font-size:0.875rem; color:var(--md-sys-color-on-surface-variant);">Password (optional — leave empty to generate)</span>
+          <input type="text" name="password" autocomplete="new-password" style="width:100%; padding:8px;">
+        </label>
+        <button type="submit" class="c-button c-button--filled" {{ if not .Configured }}disabled{{ end }}><span class="c-button__label">Create</span></button>
+      </form>
+    </div>
+  </article>
+
+  <article class="c-card c-card--outlined">
+    <div class="c-card__header"><h2 class="c-card__title">Add alias</h2></div>
+    <div class="c-card__body">
+      <form method="post" action="/admin/mail/alias" style="display:flex; flex-direction:column; gap:8px;">
+        <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+        <label>
+          <span style="display:block; font-size:0.875rem; color:var(--md-sys-color-on-surface-variant);">From</span>
+          <input type="email" name="from" required placeholder="hello@shopifygmc.com" style="width:100%; padding:8px;">
+        </label>
+        <label>
+          <span style="display:block; font-size:0.875rem; color:var(--md-sys-color-on-surface-variant);">To (any address — local mailbox or external)</span>
+          <input type="text" name="to" required placeholder="support@shopifygmc.com" style="width:100%; padding:8px;">
+        </label>
+        <button type="submit" class="c-button c-button--filled" {{ if not .Configured }}disabled{{ end }}><span class="c-button__label">Create</span></button>
+      </form>
+    </div>
+  </article>
+</section>
+
+<article class="c-card c-card--outlined" style="margin-top:24px;">
+  <div class="c-card__header"><h2 class="c-card__title">Mailboxes · {{ len .Mailboxes }}</h2></div>
+  <div class="c-card__body">
+    {{- if .Mailboxes }}
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="text-align:left; color:var(--md-sys-color-on-surface-variant);">
+          <th style="padding:8px 0;">Address</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{- range .Mailboxes }}
+        <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
+          <td style="padding:10px 0;"><code>{{ . }}</code></td>
+          <td style="padding:10px 0; text-align:right; display:flex; gap:8px; justify-content:flex-end;">
+            <form method="post" action="/admin/mail/passwd" style="margin:0;">
+              <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+              <input type="hidden" name="email" value="{{ . }}">
+              <button type="submit" class="c-button c-button--outlined c-button--small" onclick="return confirm('Rotate password for {{ . }}?')"><span class="c-button__label">Rotate password</span></button>
+            </form>
+            <form method="post" action="/admin/mail/del" style="margin:0;" onsubmit="this.confirm.value = prompt('Type {{ . }} to confirm deletion:'); return this.confirm.value !== null;">
+              <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+              <input type="hidden" name="email" value="{{ . }}">
+              <input type="hidden" name="confirm" value="">
+              <button type="submit" class="c-button c-button--outlined c-button--small"><span class="c-button__label">Delete</span></button>
+            </form>
+          </td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+    {{- else }}
+    <p style="color:var(--md-sys-color-on-surface-variant);">No mailboxes yet.</p>
+    {{- end }}
+  </div>
+</article>
+
+<article class="c-card c-card--outlined" style="margin-top:24px;">
+  <div class="c-card__header"><h2 class="c-card__title">Aliases · {{ len .Aliases }}</h2></div>
+  <div class="c-card__body">
+    {{- if .Aliases }}
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="text-align:left; color:var(--md-sys-color-on-surface-variant);">
+          <th style="padding:8px 0;">From</th>
+          <th style="padding:8px 0;">To</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{- range .Aliases }}
+        <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
+          <td style="padding:10px 0;"><code>{{ .From }}</code></td>
+          <td style="padding:10px 0;"><code>{{ .To }}</code></td>
+          <td style="padding:10px 0; text-align:right;">
+            <form method="post" action="/admin/mail/unalias" style="margin:0;">
+              <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+              <input type="hidden" name="from" value="{{ .From }}">
+              <button type="submit" class="c-button c-button--outlined c-button--small" onclick="return confirm('Remove alias {{ .From }} → {{ .To }}?')"><span class="c-button__label">Remove</span></button>
+            </form>
+          </td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+    {{- else }}
+    <p style="color:var(--md-sys-color-on-surface-variant);">No aliases.</p>
+    {{- end }}
+  </div>
+</article>
+
+{{ end }}
+{{ end }}
