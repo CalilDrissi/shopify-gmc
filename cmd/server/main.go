@@ -282,6 +282,17 @@ func main() {
 	mux.HandleFunc("POST /logout", h.Logout)
 	mux.HandleFunc("GET /verify-email/{token}", h.VerifyEmail)
 	mux.HandleFunc("POST /verify-email/resend", h.ResendVerification)
+	mux.HandleFunc("GET /verify-email-pending", h.VerifyEmailPending)
+	// favicon + robots — both are universal browser/crawler requests; without
+	// them every landing-page load logs a console 404 and search-engine
+	// crawlers see a 404 trying to find robots.txt.
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/favicon.ico")
+	})
+	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte("User-agent: *\nDisallow: /admin/\nDisallow: /t/\nAllow: /\n"))
+	})
 	mux.HandleFunc("GET /forgot-password", h.ForgotForm)
 	mux.HandleFunc("POST /forgot-password", h.Forgot)
 	mux.HandleFunc("GET /reset-password/{token}", h.ResetForm)

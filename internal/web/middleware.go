@@ -78,13 +78,18 @@ func SecurityHeaders(opts SecurityHeadersOptions) func(http.Handler) http.Handle
 // Alpine.js evaluates inline expressions (e.g. `open = !open`) via Function(),
 // which needs 'unsafe-eval'. The alternative is Alpine's CSP-compliant build,
 // which forbids inline expressions and requires Alpine.data() registration.
+//
+// gumroad.com is allowlisted for the pricing/billing pages — Gumroad's
+// overlay JS, CSS, fonts and images all live across gumroad.com +
+// assets.gumroad.com. Audited by scripts/audit-pages.js.
 const defaultCSP = "default-src 'self'; " +
-	"script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-	"style-src 'self' 'unsafe-inline'; " +
-	"img-src 'self' data: blob:; " +
-	"font-src 'self' data:; " +
-	"connect-src 'self'; " +
-	"form-action 'self'; " +
+	"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://gumroad.com https://*.gumroad.com; " +
+	"style-src 'self' 'unsafe-inline' https://gumroad.com https://*.gumroad.com; " +
+	"img-src 'self' data: blob: https://*.gumroad.com https://assets.gumroad.com; " +
+	"font-src 'self' data: https://*.gumroad.com https://assets.gumroad.com; " +
+	"connect-src 'self' https://gumroad.com https://*.gumroad.com https://assets.gumroad.com; " +
+	"form-action 'self' https://gumroad.com https://*.gumroad.com; " +
+	"frame-src https://gumroad.com https://*.gumroad.com; " +
 	"base-uri 'self'; " +
 	"frame-ancestors 'none'; " +
 	"object-src 'none'"

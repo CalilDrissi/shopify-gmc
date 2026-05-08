@@ -332,6 +332,17 @@ func (h *Handlers) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, "verify-email", map[string]any{"Title": "Email confirmed", "OK": true})
 }
 
+// VerifyEmailPending renders the "check your inbox" page directly. POST
+// /signup also renders this template inline; this GET route just makes
+// it survive a browser refresh after signup.
+func (h *Handlers) VerifyEmailPending(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("email")
+	h.render(w, r, "verify-email-pending", map[string]any{
+		"Title": "Confirm your email",
+		"Email": email,
+	})
+}
+
 func (h *Handlers) ResendVerification(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		h.renderError(w, http.StatusBadRequest, "Invalid form.")
