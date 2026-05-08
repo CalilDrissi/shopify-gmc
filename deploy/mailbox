@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# mailbox — manage Dovecot + Postfix virtual mailboxes on shopifygmc.com.
+#
+#   mailbox add EMAIL [PASSWORD]   create a mailbox (random pw if omitted)
+#   mailbox passwd EMAIL [PASSWORD]   change password (random pw if omitted)
+#   mailbox del EMAIL              delete a mailbox + its Maildir
+#   mailbox alias FROM TO          alias FROM → TO (TO can be a real
+#                                  mailbox, an external address, or another
+#                                  alias)
+#   mailbox unalias FROM           remove an alias
+#   mailbox list                   list mailboxes + aliases
+set -euo pipefail
+
+DOMAIN_RE='^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+USERS=/etc/dovecot/users
+VMAILBOX=/etc/postfix/vmailbox
+VIRTUAL=/etc/postfix/virtual
+VMAIL_BASE=/var/mail/vmail
+
+require_root() {
+  [ "$EUID" -eq 0 ] || { echo "must run as root"; exit 1; }
+}
+require_email() {
+  [[ "$1" =~ $DOMAIN_RE ]] || { echo "not a valid email: $1"; exit 1; }
+}
+gen_pw() {
+  openssl rand -base64 27 | tr -d '/+=' | tr -d 'O0Il' | cut -c1-24
+}
+local_part() { echo "$1" | cut -d@ -f1; }
+domain_of()  { echo "$1" | cut -d@ -f2; }
+
+cmd_add() {
+  local email="${1:?email required}" pw="${2:-}"
+  require_email "$email"
+  local local=$(local_part "$email") domain=$(domain_of "$email")
+  if grep -q "^$email:" "$USERS"; then
+    echo "already exists: $email (use 'mailbox passwd' to change)"; exit 1
+  fi
+  [ -z "$pw" ] && pw=$(gen_pw)
+
+  local hash; hash=$(doveadm pw -s ARGON2ID -p "$pw")
+  echo "$email:$hash:5000:5000::$VMAIL_BASE/$domain/$local::" >> "$USERS"
+  install -d -o vmail -g vmail -m 0700 "$VMAIL_BASE/$domain/$local"
+
+  echo "$email    $domain/$local/" >> "$VMAILBOX"
+  postmap "$VMAILBOX"
+
+  echo "ok: $email created"
+  echo "    password: $pw"
+  echo "    (record it — not retrievable later)"
+}
+
+cmd_passwd() {
+  local email="${1:?email required}" pw="${2:-}"
+  require_email "$email"
+  grep -q "^$email:" "$USERS" || { echo "no such mailbox: $email"; exit 1; }
+  [ -z "$pw" ] && pw=$(gen_pw)
+  local hash; hash=$(doveadm pw -s ARGON2ID -p "$pw")
+  # Replace the line in-place
+  sed -i "\|^$email:|d" "$USERS"
+  local local=$(local_part "$email") domain=$(domain_of "$email")
+  echo "$email:$hash:5000:5000::$VMAIL_BASE/$domain/$local::" >> "$USERS"
+  echo "ok: password rotated for $email"
+  echo "    new password: $pw"
+}
+
+cmd_del() {
+  local email="${1:?email required}"
+  require_email "$email"
+  read -p "permanently delete $email and its mail? [type the email to confirm] " confirm
+  [ "$confirm" = "$email" ] || { echo "aborted"; exit 1; }
+  local local=$(local_part "$email") domain=$(domain_of "$email")
+  sed -i "\|^$email:|d" "$USERS"
+  sed -i "\|^$email\\s|d" "$VMAILBOX"
+  postmap "$VMAILBOX"
+  rm -rf "$VMAIL_BASE/$domain/$local"
+  echo "ok: $email deleted"
+}
+
+cmd_alias() {
+  local from="${1:?from required}" to="${2:?to required}"
+  require_email "$from"
+  # Remove old entry if present, then append
+  sed -i "\|^$from\\s|d" "$VIRTUAL"
+  echo "$from    $to" >> "$VIRTUAL"
+  postmap "$VIRTUAL"
+  echo "ok: $from → $to"
+}
+
+cmd_unalias() {
+  local from="${1:?from required}"
+  sed -i "\|^$from\\s|d" "$VIRTUAL"
+  postmap "$VIRTUAL"
+  echo "ok: removed alias for $from"
+}
+
+cmd_list() {
+  echo "=== mailboxes ==="
+  awk -F: '{print "  " $1}' "$USERS" | sort
+  echo ""
+  echo "=== aliases ==="
+  awk 'NF==2 {printf "  %-35s → %s\n", $1, $2}' "$VIRTUAL" | sort
+}
+
+usage() {
+  sed -n '/^# mailbox/,/^set -e/p' "$0" | sed 's/^# *//; /^$/q'
+  exit 2
+}
+
+require_root
+case "${1:-}" in
+  add)     shift; cmd_add "$@" ;;
+  passwd)  shift; cmd_passwd "$@" ;;
+  del)     shift; cmd_del "$@" ;;
+  alias)   shift; cmd_alias "$@" ;;
+  unalias) shift; cmd_unalias "$@" ;;
+  list)    cmd_list ;;
+  *)       usage ;;
+esac

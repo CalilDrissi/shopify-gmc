@@ -62,15 +62,28 @@ same box.
   `https://mail.shopifygmc.com`, and adds a Postfix submission service
   on port 587 for the webmail to send through.
 
-  After the script runs:
-  - **Add a mailbox**: hash a password with `doveadm pw -s ARGON2ID`,
-    append `email:hash:5000:5000::/var/mail/vmail/<domain>/<local>::`
-    to `/etc/dovecot/users`, then create the Maildir at
-    `/var/mail/vmail/<domain>/<local>/` owned `vmail:vmail`.
-  - **Aliases** (catch-all to admin) live in `/etc/postfix/virtual` —
-    edit + run `postmap /etc/postfix/virtual` after.
-  - **Webmail** at `https://mail.shopifygmc.com`. Login with the full
-    address and the Dovecot password.
+  After the script runs, mailbox + alias management is wrapped by the
+  `mailbox` helper in this directory (installed at
+  `/usr/local/bin/mailbox`):
+
+  ```bash
+  ssh root@HOST mailbox add support@shopifygmc.com
+  # → prints a freshly generated 24-char password (or pass it as arg 2)
+  ssh root@HOST mailbox alias hello@shopifygmc.com support@shopifygmc.com
+  ssh root@HOST mailbox passwd support@shopifygmc.com
+  ssh root@HOST mailbox del   support@shopifygmc.com   # confirms
+  ssh root@HOST mailbox list
+  ```
+
+  **Webmail** at `https://mail.shopifygmc.com`. Login with the full
+  address and the Dovecot password.
+
+  Under the hood the helper appends to `/etc/dovecot/users` (ARGON2ID
+  hashes), `/etc/postfix/vmailbox`, and `/etc/postfix/virtual`, runs
+  `postmap` on the maps that need it, and creates the Maildir at
+  `/var/mail/vmail/<domain>/<local>/` owned `vmail:vmail`. No service
+  reload required — both Dovecot and Postfix re-read these files
+  per-request.
 
   DNS additions this script depends on: `mail.shopifygmc.com` A → the
   box, MX `shopifygmc.com` → `mail.shopifygmc.com priority 10`, and
