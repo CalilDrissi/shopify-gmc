@@ -32,6 +32,29 @@ same box.
   flags. `TimeoutStopSec=35` gives the 30s in-app drain a 5s margin
   before SIGKILL.
 
+- **`smtp.sh`** — installs Postfix (outbound MTA, listening on
+  loopback only) + OpenDKIM (signing milter on `localhost:8891`),
+  generates a 2048-bit DKIM key for selector `mail`, and writes a
+  hardened `main.cf` with TLS-may + DKIM milter wired in. After
+  install, the script prints the DKIM public key in BIND format —
+  flatten to a single quoted string and add three TXT records:
+
+  - `shopifygmc.com` → SPF `v=spf1 ip4:62.169.16.57 -all`
+  - `mail._domainkey.shopifygmc.com` → DKIM
+  - `_dmarc.shopifygmc.com` → DMARC
+    `v=DMARC1; p=none; rua=mailto:dmarc@shopifygmc.com; ruf=mailto:dmarc@shopifygmc.com; fo=1`
+
+  Both env's `app.env` should set `SMTP_HOST=localhost` `SMTP_PORT=25`
+  `SMTP_FROM=noreply@shopifygmc.com`. Sending from a subdomain like
+  `@staging.shopifygmc.com` won't be DKIM-signed unless you add a
+  KeyTable+SigningTable for that subdomain — simplest is to keep both
+  envs sending from the apex `From:`.
+
+  **Reverse DNS (PTR) for the box's IPv4 → `mail.shopifygmc.com`** has
+  to be set on the VPS provider's side, NOT in Cloudflare. Until then
+  Gmail flags outbound as suspicious. On Contabo this lives in the
+  customer panel under "Reverse DNS" for the VPS.
+
 ## Layout on the box
 
 ```
