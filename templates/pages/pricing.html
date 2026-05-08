@@ -1,27 +1,97 @@
 {{ define "content" }}
 <h1 class="page-title">Pricing</h1>
-<p style="color:var(--md-sys-color-on-surface-variant); margin-bottom:24px;">Pay yearly via Gumroad. No credit card required to start.</p>
-<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px;">
-  <article class="c-card c-card--outlined">
+<p style="color:var(--md-sys-color-on-surface-variant); margin-bottom:24px;">Subscribe via Gumroad. Cancel anytime; you keep your plan until the period ends.</p>
+
+<div class="c-pricing-grid">
+  {{- /* Free tier */ -}}
+  <article class="c-card c-card--outlined c-tier">
     <div class="c-card__header">
       <h3 class="c-card__title">Free</h3>
-      <p class="c-card__subtitle">5 products / month</p>
+      <p class="c-card__subtitle">$0 forever</p>
     </div>
-    <div class="c-card__body">Try the audit on a single store. Forever free.</div>
+    <div class="c-card__body">
+      <ul class="c-tier__feats">
+        <li>1 store</li>
+        <li>1 audit per month</li>
+        <li>3 members</li>
+        <li>No monitoring</li>
+      </ul>
+    </div>
+    <div class="c-card__footer">
+      <a href="/signup" class="c-button c-button--outlined"><span class="c-button__label">Sign up free</span></a>
+    </div>
   </article>
-  <article class="c-card c-card--elevated">
+
+  {{- range .Tiers }}
+  <article class="c-card {{ if eq .Kind "growth" }}c-card--elevated{{ else }}c-card--outlined{{ end }} c-tier">
     <div class="c-card__header">
-      <h3 class="c-card__title">Pro</h3>
-      <p class="c-card__subtitle">$29 / mo · 1 store · daily monitoring</p>
+      <h3 class="c-card__title">{{ .Title }}</h3>
+      <p class="c-card__subtitle">${{ printf "%.0f" (toFloat .PriceCents) | trim }} / mo</p>
     </div>
-    <div class="c-card__body">Full audits, AI fix suggestions, alert subscriptions.</div>
-  </article>
-  <article class="c-card c-card--outlined">
-    <div class="c-card__header">
-      <h3 class="c-card__title">Agency</h3>
-      <p class="c-card__subtitle">$89 / mo · 25 stores</p>
+    <div class="c-card__body">
+      <ul class="c-tier__feats">
+        {{- if eq .Kind "starter" }}
+        <li>3 stores</li>
+        <li>10 audits / mo</li>
+        <li>5 members</li>
+        <li>Weekly monitoring</li>
+        <li>1 GMC connection</li>
+        {{- else if eq .Kind "growth" }}
+        <li>10 stores</li>
+        <li>50 audits / mo</li>
+        <li>15 members</li>
+        <li>Daily monitoring</li>
+        <li>3 GMC connections</li>
+        {{- else if eq .Kind "agency" }}
+        <li>50 stores</li>
+        <li>500 audits / mo</li>
+        <li>50 members</li>
+        <li>Daily priority monitoring</li>
+        <li>50 GMC connections</li>
+        <li>White-label PDF</li>
+        {{- end }}
+      </ul>
     </div>
-    <div class="c-card__body">Multi-tenant workspaces with role-based access.</div>
+    <div class="c-card__footer">
+      {{- if .GumroadID }}
+      <a class="c-button c-button--filled gumroad-button"
+         href="{{ .OverlayURL }}?wanted=true{{ if $.TenantID }}&tenant_id={{ $.TenantID }}{{ end }}">
+        <span class="c-button__label">Upgrade to {{ .Title }}</span>
+      </a>
+      {{- else }}
+      <button type="button" class="c-button c-button--outlined" disabled title="GUMROAD_PRODUCT_{{ .Kind | upper }} not set"><span class="c-button__label">Coming soon</span></button>
+      {{- end }}
+    </div>
   </article>
+  {{- end }}
 </div>
+
+<h2 style="margin:48px 0 16px;">One-time services</h2>
+<div class="c-pricing-grid">
+  {{- with .Rescue }}
+  <article class="c-card c-card--filled c-tier">
+    <div class="c-card__header">
+      <h3 class="c-card__title">{{ .Title }}</h3>
+      <p class="c-card__subtitle">${{ printf "%.0f" (toFloat .PriceCents) }} one-time</p>
+    </div>
+    <div class="c-card__body">A senior auditor walks every page of your store and submits a written report. Turnaround: 5 business days.</div>
+    <div class="c-card__footer">
+      {{- if .GumroadID }}<a class="c-button c-button--filled gumroad-button" href="{{ .OverlayURL }}?wanted=true{{ if $.TenantID }}&tenant_id={{ $.TenantID }}{{ end }}"><span class="c-button__label">Buy Rescue Audit</span></a>{{ else }}<button type="button" class="c-button c-button--outlined" disabled><span class="c-button__label">Coming soon</span></button>{{ end }}
+    </div>
+  </article>
+  {{- end }}
+  {{- with .DFY }}
+  <article class="c-card c-card--filled c-tier">
+    <div class="c-card__header">
+      <h3 class="c-card__title">{{ .Title }}</h3>
+      <p class="c-card__subtitle">${{ printf "%.0f" (toFloat .PriceCents) }} one-time</p>
+    </div>
+    <div class="c-card__body">We file the GMC reinstatement on your behalf — appeal letter, evidence pack, follow-ups until resolved.</div>
+    <div class="c-card__footer">
+      {{- if .GumroadID }}<a class="c-button c-button--filled gumroad-button" href="{{ .OverlayURL }}?wanted=true{{ if $.TenantID }}&tenant_id={{ $.TenantID }}{{ end }}"><span class="c-button__label">Buy DFY Reinstatement</span></a>{{ else }}<button type="button" class="c-button c-button--outlined" disabled><span class="c-button__label">Coming soon</span></button>{{ end }}
+    </div>
+  </article>
+  {{- end }}
+</div>
+<script src="https://gumroad.com/js/gumroad.js"></script>
 {{ end }}

@@ -1,0 +1,59 @@
+{{ define "audit-progress-fragment" -}}
+{{ with .Audit -}}
+{{- $polling := or (eq .Status "queued") (eq .Status "running") -}}
+<div id="audit-status"
+     class="audit-progress"
+     data-status="{{ .Status }}"
+     {{- if $polling }}
+     hx-get="/t/{{ $.Tenant.Slug }}/audits/{{ .ID }}/status"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML"
+     {{- end }}>
+  {{- if eq .Status "queued" }}
+  <article class="c-card c-card--outlined">
+    <div class="c-card__body" style="display:flex; align-items:center; gap:12px;">
+      <span class="c-pill c-pill--outlined">queued</span>
+      <span style="color:var(--md-sys-color-on-surface-variant);">Waiting for a worker. Polling every 2s.</span>
+    </div>
+  </article>
+  {{- else if eq .Status "running" }}
+  <article class="c-card c-card--elevated">
+    <div class="c-card__header">
+      <h2 class="c-card__title">Audit in progress</h2>
+      <p class="c-card__subtitle">Polling every 2s.</p>
+    </div>
+    <div class="c-card__body">{{ template "audit-stage-list" .Stages }}</div>
+  </article>
+  {{- else if eq .Status "succeeded" }}
+  <article class="c-card c-card--outlined" style="margin-top:24px;">
+    <div class="c-card__header"><h3 class="c-card__title">Stages</h3></div>
+    <div class="c-card__body">{{ template "audit-stage-list" .Stages }}</div>
+  </article>
+  {{- else if eq .Status "failed" }}
+  <article class="c-card c-card--outlined">
+    <div class="c-card__header">
+      <h2 class="c-card__title">Audit failed</h2>
+      <p class="c-card__subtitle">{{ if .ErrorMessage }}{{ deref .ErrorMessage }}{{ end }}</p>
+    </div>
+    <div class="c-card__body">{{ template "audit-stage-list" .Stages }}</div>
+  </article>
+  {{- end }}
+</div>
+{{- end }}
+{{- end }}
+
+{{ define "audit-stage-list" -}}
+{{- if . -}}
+<ol style="list-style:none; padding:0; display:flex; flex-direction:column; gap:8px; margin:0;">
+  {{- range . }}
+  <li style="display:flex; align-items:center; gap:12px; padding:8px 12px; border-radius:8px; background:var(--md-sys-color-surface-container);">
+    <span class="c-pill c-pill--{{ if eq .Status `ok` }}success{{ else if eq .Status `failed` }}critical{{ else }}outlined{{ end }}">{{ .Status }}</span>
+    <strong>{{ .Name }}</strong>
+    <span style="color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">{{ .Detail }}</span>
+  </li>
+  {{- end }}
+</ol>
+{{- else -}}
+<p style="color:var(--md-sys-color-on-surface-variant);">No stage data yet.</p>
+{{- end -}}
+{{- end }}

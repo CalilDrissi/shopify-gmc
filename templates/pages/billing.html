@@ -1,0 +1,102 @@
+{{ define "content" }}
+{{- $tenant := .Tenant -}}
+{{- $csrf := .CSRFToken -}}
+{{ with .Data }}
+
+<header style="display:flex; align-items:center; justify-content:space-between; gap:16px;">
+  <h1 class="page-title" style="margin:0;">Billing</h1>
+  {{- if .GumroadSubID }}
+  <a href="https://gumroad.com/library" target="_blank" rel="noopener" class="c-button c-button--text">
+    <span class="c-button__label">Manage subscription on Gumroad ↗</span>
+  </a>
+  {{- end }}
+</header>
+
+{{- if .ReturnGumroad }}
+<article class="c-card c-card--elevated" style="margin-top:16px; border-left:4px solid var(--md-sys-color-primary);">
+  <div class="c-card__body">
+    <h2 class="c-card__title" style="margin:0 0 8px;">Thanks for the purchase!</h2>
+    <div id="billing-poll" hx-get="/t/{{ $tenant.Slug }}/billing/poll" hx-trigger="load, every 2s" hx-swap="outerHTML" data-state="pending">
+      <p>Processing payment… (we're waiting for Gumroad's webhook to land)</p>
+    </div>
+  </div>
+</article>
+{{- end }}
+
+<article class="c-card c-card--elevated" style="margin-top:24px;">
+  <div class="c-card__header">
+    <h2 class="c-card__title">Current plan</h2>
+    <p class="c-card__subtitle">{{ $tenant.Name }}</p>
+  </div>
+  <div class="c-card__body">
+    <p style="margin:0 0 8px;">
+      <span class="c-pill c-pill--filled" style="text-transform:capitalize;">{{ $tenant.Plan }}</span>
+      {{- if $.Data.PendingPlan }} · <strong>downgrades to {{ deref $.Data.PendingPlan }}</strong> on {{ if $.Data.PendingAt }}{{ $.Data.PendingAt.Format "Jan 2, 2006" }}{{ end }}{{ end }}
+    </p>
+  </div>
+</article>
+
+<h2 style="margin:32px 0 12px;">Compare plans</h2>
+<div class="c-pricing-grid">
+  <article class="c-card c-card--outlined c-tier">
+    <div class="c-card__header"><h3 class="c-card__title">Free</h3><p class="c-card__subtitle">$0 forever</p></div>
+    <div class="c-card__body"><ul class="c-tier__feats"><li>1 store</li><li>1 audit/mo</li><li>3 members</li><li>No monitoring</li></ul></div>
+  </article>
+  {{- range .Tiers }}
+  <article class="c-card {{ if eq .Kind "growth" }}c-card--elevated{{ else }}c-card--outlined{{ end }} c-tier">
+    <div class="c-card__header"><h3 class="c-card__title">{{ .Title }}</h3><p class="c-card__subtitle">${{ printf "%.0f" (toFloat .PriceCents) }} / mo</p></div>
+    <div class="c-card__body">
+      <ul class="c-tier__feats">
+        {{- if eq .Kind "starter" }}<li>3 stores</li><li>10 audits/mo</li><li>5 members</li><li>Weekly monitoring</li><li>1 GMC connection</li>
+        {{- else if eq .Kind "growth" }}<li>10 stores</li><li>50 audits/mo</li><li>15 members</li><li>Daily monitoring</li><li>3 GMC connections</li>
+        {{- else }}<li>50 stores</li><li>500 audits/mo</li><li>50 members</li><li>Daily priority monitoring</li><li>50 GMC connections</li><li>White-label PDF</li>{{ end }}
+      </ul>
+    </div>
+    <div class="c-card__footer">
+      {{- if .GumroadID }}
+        {{- if eq (printf "%v" $tenant.Plan) .PlanTier }}
+        <button type="button" class="c-button c-button--outlined" disabled><span class="c-button__label">Current plan</span></button>
+        {{- else }}
+        <a class="c-button c-button--filled gumroad-button" href="{{ .OverlayURL }}?wanted=true&tenant_id={{ $tenant.ID }}"><span class="c-button__label">Upgrade to {{ .Title }}</span></a>
+        {{- end }}
+      {{- else }}<button type="button" class="c-button c-button--outlined" disabled><span class="c-button__label">Coming soon</span></button>{{ end }}
+    </div>
+  </article>
+  {{- end }}
+</div>
+
+{{- if .Purchases }}
+<h2 style="margin:32px 0 12px;">Purchase history</h2>
+<article class="c-card c-card--outlined">
+  <div class="c-card__body">
+    <table style="width:100%; border-collapse:collapse;">
+      <thead><tr style="text-align:left; color:var(--md-sys-color-on-surface-variant);">
+        <th style="padding:8px 0;">Date</th>
+        <th style="padding:8px 0;">Product</th>
+        <th style="padding:8px 0;">Plan</th>
+        <th style="padding:8px 0;">Amount</th>
+        <th style="padding:8px 0;">Status</th>
+        <th style="padding:8px 0;">Sale ID</th>
+      </tr></thead>
+      <tbody>
+        {{- range .Purchases }}
+        <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
+          <td style="padding:10px 0;">{{ if .PurchasedAt }}{{ .PurchasedAt.Format "Jan 2 2006" }}{{ else }}—{{ end }}</td>
+          <td style="padding:10px 0;">{{ .ProductID }}</td>
+          <td style="padding:10px 0; text-transform:capitalize;">{{ .Plan }}</td>
+          <td style="padding:10px 0;">{{ if .AmountCents }}${{ printf "%.2f" (toFloat .AmountCents) }} {{ .Currency }}{{ end }}</td>
+          <td style="padding:10px 0;">
+            <span class="c-pill c-pill--{{ if eq .Status `active` }}success{{ else if eq .Status `refunded` }}critical{{ else }}outlined{{ end }}">{{ .Status }}</span>
+          </td>
+          <td style="padding:10px 0;"><code>{{ .SaleID }}</code></td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+  </div>
+</article>
+{{- end }}
+
+<script src="https://gumroad.com/js/gumroad.js"></script>
+{{ end }}
+{{ end }}

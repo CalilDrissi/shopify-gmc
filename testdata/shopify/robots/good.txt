@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /admin
+Disallow: /cart
+Disallow: /orders
+Disallow: /checkout
+Disallow: /search
+
+Sitemap: https://acme.myshopify.com/sitemap.xml

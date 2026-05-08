@@ -1,0 +1,3 @@
+-- Postgres does not support removing values from an enum without dropping
+-- and recreating the type. We accept this as a one-way migration in dev.
+-- For a true rollback, restore from a snapshot taken before applying.

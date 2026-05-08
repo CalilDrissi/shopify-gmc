@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ if .Title }}{{ .Title }} · {{ end }}{{ .Tenant.Name }}</title>
   <link rel="stylesheet" href="/static/css/main.css">
+  <script src="/static/js/htmx.js" defer></script>
   <script src="/static/js/alpine.js" defer></script>
 </head>
 <body class="l-tenant">
@@ -44,6 +45,8 @@
     <aside class="l-tenant__sidebar">
       <nav>
         <a href="/t/{{ .Tenant.Slug }}">Dashboard</a>
+        <a href="/t/{{ .Tenant.Slug }}/stores">Stores</a>
+        <a href="/t/{{ .Tenant.Slug }}/audits">Audits</a>
         <a href="/t/{{ .Tenant.Slug }}/members">Members</a>
         <a href="/account">Account</a>
       </nav>

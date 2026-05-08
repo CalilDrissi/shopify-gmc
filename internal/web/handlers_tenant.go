@@ -81,6 +81,28 @@ func (h *Handlers) renderTenant(w http.ResponseWriter, r *http.Request, page str
 func (h *Handlers) Dashboard(w http.ResponseWriter, r *http.Request) {
 	d := h.buildTenantData(r)
 	d.Title = "Dashboard"
+
+	// GMC summary: count of stores + connected + with active warnings.
+	// Includes 'error' so the "needs attention" total reflects API failures
+	// alongside Google-reported warnings.
+	type gmcSummary struct {
+		TotalStores     int
+		Connected       int
+		WithWarnings    int
+		WithSuspensions int
+	}
+	var s gmcSummary
+	_ = h.Pool.QueryRow(r.Context(), `
+		SELECT
+			(SELECT count(*) FROM stores WHERE tenant_id = $1),
+			(SELECT count(*) FROM store_gmc_connections WHERE tenant_id = $1 AND status = 'active'),
+			(SELECT count(*) FROM store_gmc_connections WHERE tenant_id = $1 AND status = 'active' AND warnings_count > 0),
+			(SELECT count(*) FROM store_gmc_connections WHERE tenant_id = $1 AND status = 'active' AND suspensions_count > 0)
+	`, d.Tenant.ID).Scan(&s.TotalStores, &s.Connected, &s.WithWarnings, &s.WithSuspensions)
+
+	d.Data = map[string]any{
+		"GMC": s,
+	}
 	h.renderTenant(w, r, "dashboard", d)
 }
 
@@ -128,6 +150,10 @@ func (h *Handlers) CreateInvitation(w http.ResponseWriter, r *http.Request) {
 	}
 	if email == "" || !strings.Contains(email, "@") {
 		http.Redirect(w, r, "/t/"+d.Tenant.Slug+"/members?err=invalid-email", http.StatusFound)
+		return
+	}
+	if e := h.EnforcePlanLimit(r.Context(), d.Tenant.ID, string(d.Tenant.Plan), ResMembers); e != nil {
+		h.RenderPlanLimit(w, r, e)
 		return
 	}
 

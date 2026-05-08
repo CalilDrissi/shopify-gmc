@@ -1,0 +1,31 @@
+@use '../abstracts' as a;
+
+.c-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: a.$space-4;
+  align-items: stretch;
+}
+
+.c-tier {
+  display: flex;
+  flex-direction: column;
+
+  .c-card__body { flex: 1; }
+
+  &__feats {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    li::before {
+      content: "✓ ";
+      color: var(--md-sys-color-primary);
+      font-weight: 700;
+      margin-right: 6px;
+    }
+  }
+}

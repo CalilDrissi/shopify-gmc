@@ -1,0 +1,33 @@
+{{- /*
+  score-gauge — semicircular SVG gauge from 0 (red) to 100 (green).
+  Input: dict "Score" int "Risk" string.
+
+  Geometry: half-circle, radius 80, centered at (100, 100). Total arc length
+  is π·r ≈ 251.33. We dash-offset the foreground stroke by (1-score/100)·arc.
+*/ -}}
+{{ define "score-gauge" -}}
+{{- $score := .Score -}}
+{{- $risk := .Risk -}}
+{{- $arc := 251.327 -}}
+{{- $dashFloat := mul (sub 100 $score) 2.51327 -}}
+{{- $color := "var(--md-sys-color-error)" -}}
+{{- if eq $risk "low" }}{{ $color = "#1b873f" }}{{ end -}}
+{{- if eq $risk "medium" }}{{ $color = "#b76b00" }}{{ end -}}
+{{- if eq $risk "high" }}{{ $color = "#b3261e" }}{{ end -}}
+<div class="c-gauge">
+  <svg viewBox="0 0 200 120" class="c-gauge__svg" aria-label="Score gauge">
+    <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none"
+          stroke="var(--md-sys-color-surface-container-highest)" stroke-width="16" stroke-linecap="round"/>
+    <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none"
+          stroke="{{ $color }}" stroke-width="16" stroke-linecap="round"
+          stroke-dasharray="{{ printf "%.2f" $arc }}"
+          stroke-dashoffset="{{ printf "%.2f" $dashFloat }}"
+          style="transition: stroke-dashoffset 600ms ease;"/>
+    <text x="100" y="95" text-anchor="middle" class="c-gauge__score" fill="var(--md-sys-color-on-surface)">{{ $score }}</text>
+    <text x="100" y="115" text-anchor="middle" class="c-gauge__label" fill="var(--md-sys-color-on-surface-variant)">/ 100</text>
+  </svg>
+  <div class="c-gauge__risk">
+    <span class="c-pill c-pill--{{ if eq $risk `low` }}success{{ else if eq $risk `medium` }}warning{{ else }}critical{{ end }}">{{ $risk }} risk</span>
+  </div>
+</div>
+{{- end }}

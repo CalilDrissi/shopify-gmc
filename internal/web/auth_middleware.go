@@ -46,11 +46,14 @@ func RequireUser(cm *auth.CookieManager, sessions *auth.SessionStore, users User
 			}
 			ctx := auth.WithSession(r.Context(), sess)
 			ctx = auth.WithUser(ctx, user)
+			adminID := ""
 			if sess.ImpersonatingUserID != nil {
 				if admin, err := users.FindUser(r.Context(), sess.UserID); err == nil {
 					ctx = WithImpersonator(ctx, admin)
+					adminID = admin.ID.String()
 				}
 			}
+			recordIdentityToScope(ctx, user.ID.String(), "", adminID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

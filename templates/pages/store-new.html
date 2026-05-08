@@ -1,0 +1,20 @@
+{{ define "content" }}
+<h1 class="page-title">Add a store</h1>
+<article class="c-card c-card--elevated">
+  <div class="c-card__header">
+    <h2 class="c-card__title">Connect a Shopify store</h2>
+    <p class="c-card__subtitle">We'll verify the URL is reachable before saving. No OAuth yet — that comes when you trigger the first audit.</p>
+  </div>
+  <form class="c-card__body" method="post" action="/t/{{ .Tenant.Slug }}/stores/new" style="display:flex; flex-direction:column; gap:16px;">
+    <input type="hidden" name="_csrf" value="{{ .CSRFToken }}">
+    {{ with .Data }}
+    {{ template "form-field" .DomainField }}
+    {{ template "form-field" .DisplayField }}
+    {{ end }}
+    <div style="display:flex; gap:12px;">
+      <button type="submit" class="c-button c-button--filled"><span class="c-button__label">Add store</span></button>
+      <a href="/t/{{ .Tenant.Slug }}/stores" class="c-button c-button--text"><span class="c-button__label">Cancel</span></a>
+    </div>
+  </form>
+</article>
+{{ end }}

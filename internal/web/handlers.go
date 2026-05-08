@@ -19,6 +19,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/example/gmcauditor/internal/auth"
+	"github.com/example/gmcauditor/internal/billing"
+	"github.com/example/gmcauditor/internal/gmc"
 	"github.com/example/gmcauditor/internal/mailer"
 	"github.com/example/gmcauditor/internal/store"
 )
@@ -33,8 +35,21 @@ type Handlers struct {
 	Mailer     mailer.Mailer
 	BaseURL    string
 	MailFrom   string
+	AppSecret  []byte // signs unsubscribe + GMC OAuth state URLs
 	LoginLimit *LoginLimiter
 	Logger     *slog.Logger
+
+	// GMC integration. Wired in cmd/server when the OAuth client_id /
+	// secret env vars are present; left nil for installs that don't
+	// connect Google.
+	GMC        *gmc.ConnectionStore
+	GMCOAuth   *gmc.OAuth
+	GMCBaseURL string // overrides the production Content API root for tests
+
+	// Gumroad billing.
+	Gumroad        *billing.Dispatcher
+	GumroadCatalog billing.Catalog
+	GumroadSecret  []byte // X-Gumroad-Signature key
 }
 
 type pageVars struct {
@@ -112,10 +127,6 @@ func (h *Handlers) renderError(w http.ResponseWriter, status int, msg string) {
 
 func (h *Handlers) Landing(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, "landing", map[string]any{"Title": "Audit your Shopify store"})
-}
-
-func (h *Handlers) Pricing(w http.ResponseWriter, r *http.Request) {
-	h.render(w, r, "pricing", map[string]any{"Title": "Pricing"})
 }
 
 func (h *Handlers) Features(w http.ResponseWriter, r *http.Request) {

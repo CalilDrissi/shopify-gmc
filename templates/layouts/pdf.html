@@ -1,0 +1,21 @@
+{{ define "layout-pdf" -}}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <title>{{ .Title }}</title>
+  <style>{{ .InlineCSS }}</style>
+  <style>
+    body { padding: 24px; background: #fff; }
+    .pdf-cover { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding-bottom:16px; border-bottom: 2px solid var(--md-sys-color-outline-variant); margin-bottom:24px; }
+    .pdf-brand { font-weight:700; font-size:18px; }
+    .pdf-meta { color: var(--md-sys-color-on-surface-variant); font-size: 0.85rem; text-align:right; }
+    .pdf-footer { margin-top: 32px; padding-top: 12px; border-top:1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); font-size:0.8rem; text-align:center; }
+    @page { size: letter; margin: 0.4in; }
+  </style>
+</head>
+<body>
+  {{ template "content" . }}
+</body>
+</html>
+{{- end }}

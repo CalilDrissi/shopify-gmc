@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS issues_fix_applied_idx;
+ALTER TABLE issues DROP COLUMN IF EXISTS fix_applied_by;
+ALTER TABLE issues DROP COLUMN IF EXISTS fix_applied_at;
+
+ALTER TABLE audits DROP COLUMN IF EXISTS next_steps;
+ALTER TABLE audits DROP COLUMN IF EXISTS summary;
+ALTER TABLE audits DROP COLUMN IF EXISTS risk_level;
+ALTER TABLE audits DROP COLUMN IF EXISTS score;
+ALTER TABLE audits DROP COLUMN IF EXISTS progress;

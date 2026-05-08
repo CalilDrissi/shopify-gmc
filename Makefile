@@ -76,8 +76,9 @@ dev-css: node_modules ## Watch Sass and recompile to static/css/main.css
 build-css: node_modules ## Compile compressed Sass to static/css/main.css (consumed by go:embed)
 	npx sass --no-source-map --style=compressed styles/main.scss:static/css/main.css
 
-vendor-js: node_modules ## Vendor Alpine.js into static/js/alpine.js
+vendor-js: node_modules ## Vendor Alpine.js + HTMX into static/js/
 	cp node_modules/alpinejs/dist/cdn.min.js static/js/alpine.js
+	cp node_modules/htmx.org/dist/htmx.min.js static/js/htmx.js
 
 docker-up: ## Start Postgres and Mailhog
 	docker compose up -d

@@ -1,0 +1,19 @@
+{{ define "content" }}
+<section class="auth-card">
+  <h1 class="page-title">Pick a Merchant Center account</h1>
+  <p>Your Google account manages more than one Merchant Center. Choose which one to attach to this store.</p>
+  <form method="post" action="/oauth/google/select" style="display:flex; flex-direction:column; gap:12px;">
+    <input type="hidden" name="token" value="{{ .PickToken }}">
+    {{ range .Accounts }}
+    <label style="display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--md-sys-color-outline-variant); border-radius:12px; cursor:pointer;">
+      <input type="radio" name="merchant_id" value="{{ .ID }}" required>
+      <div>
+        <div><strong>{{ .Name }}</strong></div>
+        <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">Merchant ID <code>{{ .ID }}</code>{{ if .WebsiteURL }} · {{ .WebsiteURL }}{{ end }}</div>
+      </div>
+    </label>
+    {{ end }}
+    <button type="submit" class="c-button c-button--filled" style="margin-top:8px;"><span class="c-button__label">Connect this account</span></button>
+  </form>
+</section>
+{{ end }}

@@ -1,0 +1,31 @@
+@use '../abstracts' as a;
+
+.c-cadence {
+  &__opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 9999px;
+    cursor: pointer;
+    background: var(--md-sys-color-surface);
+    text-transform: capitalize;
+
+    input[type=radio] {
+      accent-color: var(--md-sys-color-primary);
+    }
+
+    &--locked {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.c-trend {
+  width: 100%;
+  max-width: 320px;
+  height: 80px;
+  display: block;
+}

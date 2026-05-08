@@ -1,0 +1,17 @@
+{{ define "content" }}
+{{- $tenant := .Tenant -}}
+<h1 class="page-title">Upgrade to continue</h1>
+{{ with .Data }}
+<article class="c-card c-card--elevated" style="margin-top:16px;">
+  <div class="c-card__header">
+    <h2 class="c-card__title">{{ .Message }}</h2>
+    <p class="c-card__subtitle">Currently on the <strong style="text-transform:capitalize;">{{ .Plan }}</strong> plan.</p>
+  </div>
+  <div class="c-card__body">
+    <p style="margin:0 0 16px;">Upgrade to lift this limit. You stay on your current plan until the new period starts.</p>
+    <a href="/t/{{ $tenant.Slug }}/billing" class="c-button c-button--filled"><span class="c-button__label">View plans &amp; upgrade</span></a>
+    <a href="/t/{{ $tenant.Slug }}" class="c-button c-button--text"><span class="c-button__label">Back to dashboard</span></a>
+  </div>
+</article>
+{{ end }}
+{{ end }}

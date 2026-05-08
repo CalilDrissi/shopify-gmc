@@ -1,0 +1,66 @@
+{{ define "content" }}
+<h1 class="page-title">Audits</h1>
+{{ if .Data }}
+<article class="c-card c-card--outlined">
+  <div class="c-card__body">
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="text-align:left; color:var(--md-sys-color-on-surface-variant);">
+          <th style="padding:8px 0;">Store</th>
+          <th style="padding:8px 0;">Source</th>
+          <th style="padding:8px 0;">Status</th>
+          <th style="padding:8px 0;">Score</th>
+          <th style="padding:8px 0;">Changes</th>
+          <th style="padding:8px 0;">When</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range .Data }}
+        <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
+          <td style="padding:12px 0;"><code>{{ .Domain }}</code></td>
+          <td style="padding:12px 0;">
+            {{- if eq .Trigger "scheduled" }}
+              <span class="c-pill c-pill--filled" style="background:#e8def8; color:#21005d;">scheduled</span>
+            {{- else if eq .Trigger "manual" }}
+              <span class="c-pill c-pill--outlined">manual</span>
+            {{- else }}
+              <span class="c-pill c-pill--outlined">{{ .Trigger }}</span>
+            {{- end }}
+          </td>
+          <td style="padding:12px 0;">
+            <span class="c-pill c-pill--{{ if eq .Status `succeeded` }}success{{ else if eq .Status `failed` }}critical{{ else }}outlined{{ end }}">{{ .Status }}</span>
+          </td>
+          <td style="padding:12px 0;">
+            {{ if .Score }}<strong>{{ .Score }}</strong> / 100{{ else }}—{{ end }}
+            {{ if .RiskLevel }}<span style="color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">· {{ deref .RiskLevel }}</span>{{ end }}
+          </td>
+          <td style="padding:12px 0; font-size:0.875rem;">
+            {{- if .HavePrev }}
+              {{- if gt .NewCount 0 }}<span style="color:#b3261e;">+{{ .NewCount }} new</span>{{ end }}
+              {{- if gt .ResolvedCount 0 }}{{ if gt .NewCount 0 }} · {{ end }}<span style="color:#1b873f;">−{{ .ResolvedCount }} resolved</span>{{ end }}
+              {{- if and (eq .NewCount 0) (eq .ResolvedCount 0) }}<span style="color:var(--md-sys-color-on-surface-variant);">no changes</span>{{ end }}
+              {{- if ne .ScoreDelta 0 }}<span style="color:var(--md-sys-color-on-surface-variant);"> · Δ{{ if gt .ScoreDelta 0 }}+{{ end }}{{ .ScoreDelta }}</span>{{ end }}
+            {{- else }}
+              <span style="color:var(--md-sys-color-on-surface-variant);">first audit</span>
+            {{- end }}
+          </td>
+          <td style="padding:12px 0; color:var(--md-sys-color-on-surface-variant);">
+            {{ if .StartedAt }}{{ .StartedAt.Format "Jan 2 15:04:05" }}{{ else }}—{{ end }}
+          </td>
+          <td style="padding:12px 0; text-align:right;">
+            <a href="/t/{{ $.Tenant.Slug }}/audits/{{ .ID }}" class="c-button c-button--text c-button--small"><span class="c-button__label">Open</span></a>
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</article>
+{{ else }}
+<article class="c-card c-card--outlined" style="text-align:center; padding:32px 16px;">
+  <h2 class="c-card__title">No audits yet</h2>
+  <p style="color:var(--md-sys-color-on-surface-variant);">Open a store and run your first audit.</p>
+</article>
+{{ end }}
+{{ end }}

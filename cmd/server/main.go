@@ -7,6 +7,7 @@ import (
 	"crypto/sha512"
 	"database/sql"
 	"encoding/base64"
+	"fmt"
 	"html/template"
 	"log"
 	"log/slog"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,6 +24,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/example/gmcauditor/internal/auth"
+	"github.com/example/gmcauditor/internal/billing"
+	"github.com/example/gmcauditor/internal/gmc"
 	"github.com/example/gmcauditor/internal/mailer"
 	"github.com/example/gmcauditor/internal/settings"
 	"github.com/example/gmcauditor/internal/store"
@@ -70,6 +74,53 @@ func main() {
 			in.Invalid = invalid
 			return in
 		},
+		// dict builds a string→any map from "key", value pairs — used by partials
+		// that need to be invoked with a synthetic context.
+		"dict": func(values ...any) (map[string]any, error) {
+			if len(values)%2 != 0 {
+				return nil, fmt.Errorf("dict needs an even number of args")
+			}
+			m := make(map[string]any, len(values)/2)
+			for i := 0; i < len(values); i += 2 {
+				k, ok := values[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("dict key must be a string, got %T", values[i])
+				}
+				m[k] = values[i+1]
+			}
+			return m, nil
+		},
+		// deref returns "" for a nil *string and the underlying string otherwise.
+		"deref": func(s *string) string {
+			if s == nil {
+				return ""
+			}
+			return *s
+		},
+		"derefInt": func(i *int) int {
+			if i == nil {
+				return 0
+			}
+			return *i
+		},
+		"deref_bool": func(b *bool) bool {
+			return b != nil && *b
+		},
+		// toFloat converts an int to a float64 so price templates can do
+		// "{{ printf "%.0f" (toFloat .PriceCents) }}" to render dollars.
+		"toFloat": func(i int) float64 { return float64(i) / 100 },
+		"upper":   func(s string) string { return strings.ToUpper(s) },
+		"trim":    func(s string) string { return strings.TrimSpace(s) },
+		// Tiny arithmetic helpers used by the score gauge.
+		"sub":   func(a, b int) int { return a - b },
+		"mul":   func(a int, b float64) float64 { return float64(a) * b },
+		"mulf":  func(a, b float64) float64 { return a * b },
+		"intDiv": func(a, b int) int {
+			if b == 0 {
+				return 0
+			}
+			return a / b
+		},
 	})
 	if err := rend.LoadPartials("templates/partials/*.html"); err != nil {
 		log.Fatalf("load partials: %v", err)
@@ -89,6 +140,16 @@ func main() {
 		{Name: "account", Layout: "templates/layouts/public.html", Template: "templates/pages/account.html"},
 		{Name: "dashboard", Layout: "templates/layouts/tenant.html", Template: "templates/pages/dashboard.html"},
 		{Name: "members", Layout: "templates/layouts/tenant.html", Template: "templates/pages/members.html"},
+		{Name: "stores", Layout: "templates/layouts/tenant.html", Template: "templates/pages/stores.html"},
+		{Name: "store-new", Layout: "templates/layouts/tenant.html", Template: "templates/pages/store-new.html"},
+		{Name: "store-detail", Layout: "templates/layouts/tenant.html", Template: "templates/pages/store-detail.html"},
+		{Name: "plan-limit", Layout: "templates/layouts/tenant.html", Template: "templates/pages/plan-limit.html"},
+		{Name: "audit-detail", Layout: "templates/layouts/tenant.html", Template: "templates/pages/audit-detail.html"},
+		{Name: "audit-report-pdf", Layout: "templates/layouts/pdf.html", Template: "templates/pages/audit-report-pdf.html"},
+		{Name: "audits-list", Layout: "templates/layouts/tenant.html", Template: "templates/pages/audits-list.html"},
+		{Name: "unsubscribe", Layout: "templates/layouts/public.html", Template: "templates/pages/unsubscribe.html"},
+		{Name: "gmc-picker", Layout: "templates/layouts/public.html", Template: "templates/pages/gmc-picker.html"},
+		{Name: "billing", Layout: "templates/layouts/tenant.html", Template: "templates/pages/billing.html"},
 		{Name: "admin-login", Layout: "templates/layouts/public.html", Template: "templates/pages/admin-login.html"},
 		{Name: "admin-totp-enroll", Layout: "templates/layouts/public.html", Template: "templates/pages/admin-totp-enroll.html"},
 		{Name: "admin-totp-verify", Layout: "templates/layouts/public.html", Template: "templates/pages/admin-totp-verify.html"},
@@ -97,9 +158,70 @@ func main() {
 		{Name: "admin-tenant-detail", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-tenant-detail.html"},
 		{Name: "admin-audit-log", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-audit-log.html"},
 		{Name: "admin-settings", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-settings.html"},
+		{Name: "admin-gmc", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-gmc.html"},
 	}
 	if err := rend.Register(pages); err != nil {
 		log.Fatalf("register pages: %v", err)
+	}
+
+	// chromedp: use Playwright's bundled Chromium when no system chromium
+	// is available (dev container). Falls back to PATH lookup.
+	if p := findChromium(); p != "" {
+		web.SetPDFChromePath(p)
+		logger.Info("pdf chromium", slog.String("path", p))
+	}
+
+	// settings cipher is needed both by the admin/settings page and by
+	// the GMC connection store (which uses it to wrap refresh tokens).
+	// Initialised here so the GMC wiring below can reference it.
+	settingsCipher, settingsErr := settings.NewCipherFromEnv()
+	if settingsErr != nil {
+		ephemeral := make([]byte, 32)
+		_, _ = rand.Read(ephemeral)
+		settingsCipher, _ = settings.NewCipher(base64.StdEncoding.EncodeToString(ephemeral))
+		logger.Warn("settings: SETTINGS_ENCRYPTION_KEY not set, using ephemeral key for this run")
+	}
+
+	// GMC OAuth + connection store wiring. The handlers tolerate nil
+	// fields, so installs without Google OAuth credentials can still run
+	// without the connect button breaking.
+	var (
+		gmcOAuth *gmc.OAuth
+		gmcConns *gmc.ConnectionStore
+	)
+	gmcClientID := os.Getenv("GOOGLE_OAUTH_CLIENT_ID")
+	gmcClientSecret := os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+	if gmcClientID != "" && gmcClientSecret != "" {
+		redirect := getenv("GOOGLE_OAUTH_REDIRECT_URL", baseURL+"/oauth/google/callback")
+		gmcOAuth = &gmc.OAuth{
+			ClientID:     gmcClientID,
+			ClientSecret: gmcClientSecret,
+			RedirectURL:  redirect,
+			AuthURL:      os.Getenv("GOOGLE_OAUTH_AUTH_URL"),   // optional override
+			TokenURL:     os.Getenv("GOOGLE_OAUTH_TOKEN_URL"),  // optional override
+			RevokeURL:    os.Getenv("GOOGLE_OAUTH_REVOKE_URL"), // optional override
+		}
+		gmcConns = gmc.NewConnectionStore(pool, settingsCipher, gmcOAuth)
+		logger.Info("gmc_oauth_configured", slog.String("redirect_url", redirect))
+	} else {
+		logger.Info("gmc_oauth_disabled", slog.String("reason", "GOOGLE_OAUTH_CLIENT_ID/SECRET not set"))
+	}
+
+	// Gumroad billing wiring. Catalog + dispatcher are constructed even
+	// when the secret/products aren't set so the pricing/billing pages
+	// can render placeholder buttons.
+	gumroadCatalog := billing.LoadCatalog()
+	gumroadDispatcher := &billing.Dispatcher{
+		Pool:          pool,
+		Catalog:       gumroadCatalog,
+		Logger:        logger,
+		Mail:          mail,
+		MailFrom:      mailFrom,
+		OperatorEmail: getenv("OPERATOR_EMAIL", mailFrom),
+	}
+	gumroadSecret := []byte(os.Getenv("GUMROAD_WEBHOOK_SECRET"))
+	if len(gumroadSecret) == 0 {
+		logger.Warn("gumroad_webhook_secret_unset", slog.String("hint", "set GUMROAD_WEBHOOK_SECRET to verify Gumroad pings"))
 	}
 
 	csrfMgr := auth.NewCSRFManager(hashKey)
@@ -107,11 +229,41 @@ func main() {
 		Pool: pool, Store: st, Renderer: rend,
 		Cookies: cookies, Sessions: sessions, CSRF: csrfMgr,
 		Mailer: mail, BaseURL: baseURL, MailFrom: mailFrom,
+		AppSecret:  []byte(appSecret),
 		LoginLimit: web.NewLoginLimiter(),
 		Logger:     logger,
+		GMC:        gmcConns,
+		GMCOAuth:   gmcOAuth,
+		GMCBaseURL: os.Getenv("GMC_BASE_URL"),
+		Gumroad:        gumroadDispatcher,
+		GumroadCatalog: gumroadCatalog,
+		GumroadSecret:  gumroadSecret,
 	}
 
 	mux := http.NewServeMux()
+
+	// Liveness / readiness — unauthenticated, fast, no DB write.
+	// /healthz: process is alive. /readyz: process can talk to Postgres.
+	// Probes are typically run by a load balancer or orchestrator; we
+	// short-circuit them out of the slog request logger to avoid drowning
+	// the audit trail (the RequestLogger middleware skips paths starting
+	// with /healthz or /readyz).
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := pool.Ping(ctx); err != nil {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("db unreachable"))
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("ready"))
+	})
 
 	// Static + components demo (carry-over from prompt 7).
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -119,7 +271,8 @@ func main() {
 
 	// Public routes.
 	mux.HandleFunc("GET /{$}", h.Landing)
-	mux.HandleFunc("GET /pricing", h.Pricing)
+	mux.HandleFunc("GET /pricing", h.PricingPage)
+	mux.HandleFunc("POST /webhooks/gumroad", h.GumroadWebhook)
 	mux.HandleFunc("GET /features", h.Features)
 	mux.HandleFunc("GET /signup", h.SignupForm)
 	mux.HandleFunc("POST /signup", h.Signup)
@@ -134,6 +287,7 @@ func main() {
 	mux.HandleFunc("POST /reset-password/{token}", h.Reset)
 	mux.HandleFunc("GET /invitations/{token}", h.Invitation)
 	mux.HandleFunc("POST /invitations/{token}/accept", h.AcceptInvitation)
+	mux.HandleFunc("GET /unsubscribe/{token}", h.Unsubscribe)
 
 	mux.HandleFunc("GET /account", h.AccountPage)
 	mux.HandleFunc("POST /account/switch/{tenant_id}", h.SwitchTenant)
@@ -159,6 +313,8 @@ func main() {
 	ownerMW := web.Chain(tenantMW, web.RequireOwner(forbidden))
 
 	mux.Handle("GET /t/{slug}", tenantMW(http.HandlerFunc(h.Dashboard)))
+	mux.Handle("GET /t/{slug}/billing", ownerMW(http.HandlerFunc(h.BillingPage)))
+	mux.Handle("GET /t/{slug}/billing/poll", tenantMW(http.HandlerFunc(h.BillingPollFragment)))
 	mux.Handle("GET /t/{slug}/members", tenantMW(http.HandlerFunc(h.MembersPage)))
 	mux.Handle("POST /t/{slug}/invitations", ownerMW(http.HandlerFunc(h.CreateInvitation)))
 	mux.Handle("POST /t/{slug}/invitations/{id}/revoke", ownerMW(http.HandlerFunc(h.RevokeInvitation)))
@@ -166,18 +322,36 @@ func main() {
 	mux.Handle("POST /t/{slug}/transfer-ownership", ownerMW(http.HandlerFunc(h.TransferOwnership)))
 	mux.Handle("POST /t/{slug}/delete", ownerMW(http.HandlerFunc(h.DeleteTenant)))
 
+	// Stores CRUD
+	mux.Handle("GET /t/{slug}/stores", tenantMW(http.HandlerFunc(h.StoresList)))
+	mux.Handle("GET /t/{slug}/stores/new", ownerMW(http.HandlerFunc(h.StoreNewForm)))
+	mux.Handle("POST /t/{slug}/stores/new", ownerMW(http.HandlerFunc(h.StoreCreate)))
+	mux.Handle("GET /t/{slug}/stores/{id}", tenantMW(http.HandlerFunc(h.StoreDetail)))
+	mux.Handle("POST /t/{slug}/stores/{id}/delete", ownerMW(http.HandlerFunc(h.StoreDelete)))
+	mux.Handle("POST /t/{slug}/stores/{id}/monitoring", tenantMW(http.HandlerFunc(h.MonitoringUpdate)))
+	mux.Handle("POST /t/{slug}/stores/{id}/run-now", tenantMW(http.HandlerFunc(h.RunNow)))
+	mux.Handle("POST /t/{slug}/stores/{id}/subscriptions", tenantMW(http.HandlerFunc(h.SubscriptionUpdate)))
+
+	// GMC OAuth routes.
+	// Connect/disconnect are scoped to a specific store + require owner;
+	// the callback is fixed (no per-store path), the picker submit also
+	// public (state-token-bound).
+	mux.Handle("GET /t/{slug}/stores/{id}/gmc/connect", ownerMW(http.HandlerFunc(h.GMCConnect)))
+	mux.Handle("POST /t/{slug}/stores/{id}/gmc/disconnect", ownerMW(http.HandlerFunc(h.GMCDisconnect)))
+	mux.HandleFunc("GET /oauth/google/callback", h.GMCCallback)
+	mux.HandleFunc("POST /oauth/google/select", h.GMCPickerSubmit)
+
+	// Audits
+	mux.Handle("POST /t/{slug}/stores/{id}/audits", tenantMW(http.HandlerFunc(h.EnqueueAudit)))
+	mux.Handle("GET /t/{slug}/audits", tenantMW(http.HandlerFunc(h.AuditsList)))
+	mux.Handle("GET /t/{slug}/audits/{id}", tenantMW(http.HandlerFunc(h.AuditDetail)))
+	mux.Handle("GET /t/{slug}/audits/{id}/status", tenantMW(http.HandlerFunc(h.AuditProgressFragment)))
+	mux.Handle("GET /t/{slug}/audits/{id}/report.pdf", tenantMW(http.HandlerFunc(h.ReportPDF)))
+	mux.Handle("POST /t/{slug}/audits/{id}/issues/{issue_id}/resolve", tenantMW(http.HandlerFunc(h.ResolveIssue)))
+
 	// Platform admin routes.
 	settingsBackend := settings.NewPostgresBackend(pool)
 	settingsAuditor := settings.NewPostgresAuditor(pool)
-	settingsCipher, settingsErr := settings.NewCipherFromEnv()
-	if settingsErr != nil {
-		// In dev we tolerate a missing key by generating an ephemeral one.
-		// Production boot guards this in cmd/server (TODO).
-		ephemeral := make([]byte, 32)
-		_, _ = rand.Read(ephemeral)
-		settingsCipher, _ = settings.NewCipher(base64.StdEncoding.EncodeToString(ephemeral))
-		logger.Warn("settings: SETTINGS_ENCRYPTION_KEY not set, using ephemeral key for this run")
-	}
 	settingsSvc := settings.New(settingsCipher, settingsBackend, settingsAuditor)
 	adminH := &web.AdminHandlers{
 		Pool: pool, Store: st, Renderer: rend,
@@ -202,6 +376,7 @@ func main() {
 	mux.HandleFunc("POST /admin/tenants/{id}/impersonate", adminH.ImpersonationStart)
 	mux.HandleFunc("POST /admin/impersonation/stop", adminH.ImpersonationStop)
 	mux.HandleFunc("GET /admin/audit-log", adminH.AuditLogPage)
+	mux.HandleFunc("GET /admin/gmc", adminH.GMCPage)
 	mux.HandleFunc("GET /admin/settings", adminH.SettingsPage)
 	mux.HandleFunc("POST /admin/settings", adminH.SettingsSave)
 	mux.HandleFunc("GET /admin/settings/test-connection", adminH.SettingsTestConnection)
@@ -234,16 +409,49 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
-	logger.Info("shutting down")
-	shutdownCtx, cancelShut := context.WithTimeout(context.Background(), 5*time.Second)
+	logger.Info("server_shutting_down", slog.Duration("drain_deadline", 30*time.Second))
+	shutdownCtx, cancelShut := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelShut()
-	_ = srv.Shutdown(shutdownCtx)
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Warn("server_shutdown_error", slog.Any("err", err))
+	} else {
+		logger.Info("server_shutdown_clean")
+	}
 }
 
 func cookieKeys(appSecret string) (hashKey, blockKey []byte) {
 	h := sha512.Sum512([]byte("hash:" + appSecret))
 	b := sha256.Sum256([]byte("block:" + appSecret))
 	return h[:32], b[:]
+}
+
+// findChromium searches the user's Playwright cache for a usable Chromium.
+// Returns "" if none is found, in which case chromedp falls back to PATH.
+func findChromium() string {
+	if v := os.Getenv("CHROMIUM_PATH"); v != "" {
+		if _, err := os.Stat(v); err == nil {
+			return v
+		}
+	}
+	for _, root := range []string{
+		os.ExpandEnv("$HOME/.cache/ms-playwright"),
+		"/home/codespace/.cache/ms-playwright",
+		"/root/.cache/ms-playwright",
+	} {
+		matches, _ := filepath.Glob(root + "/chromium-*/chrome-linux*/chrome")
+		for _, m := range matches {
+			if _, err := os.Stat(m); err == nil {
+				return m
+			}
+		}
+		matches2, _ := filepath.Glob(root + "/chromium_headless_shell-*/chrome-linux*/headless_shell")
+		for _, m := range matches2 {
+			if _, err := os.Stat(m); err == nil {
+				return m
+			}
+		}
+	}
+	return ""
 }
 
 func getenv(key, fallback string) string {

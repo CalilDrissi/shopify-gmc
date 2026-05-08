@@ -1,0 +1,157 @@
+{{ define "content" }}
+{{- $tenant := .Tenant -}}
+{{- $csrf := .CSRFToken -}}
+{{- $isOwner := .IsOwner -}}
+{{ with .Data }}
+{{- $s := .Store -}}
+{{- $mon := .Monitoring -}}
+{{- $gmc := .GMC -}}
+{{- if .GMCMessage }}{{ template "banner" .GMCMessage }}{{ end }}
+<header style="display:flex; align-items:center; justify-content:space-between; gap:16px;">
+  <div>
+    <h1 class="page-title" style="margin:0;">{{ if $s.DisplayName }}{{ deref $s.DisplayName }}{{ else }}{{ $s.ShopDomain }}{{ end }}</h1>
+    <p style="color:var(--md-sys-color-on-surface-variant);"><code>{{ $s.ShopDomain }}</code> · <span class="c-pill c-pill--outlined">{{ $s.Status }}</span></p>
+  </div>
+  <div style="display:flex; gap:8px;">
+    <form method="post" action="/t/{{ $tenant.Slug }}/stores/{{ $s.ID }}/audits" style="margin:0;">
+      <input type="hidden" name="_csrf" value="{{ $csrf }}">
+      <button type="submit" class="c-button c-button--filled"><span class="c-button__label">Run audit</span></button>
+    </form>
+    {{ if $isOwner }}
+    <form method="post" action="/t/{{ $tenant.Slug }}/stores/{{ $s.ID }}/delete" style="margin:0;">
+      <input type="hidden" name="_csrf" value="{{ $csrf }}">
+      <button type="submit" class="c-button c-button--outlined" onclick="return confirm('Remove this store? This deletes audit history too.')"><span class="c-button__label">Remove store</span></button>
+    </form>
+    {{ end }}
+  </div>
+</header>
+
+<article class="c-card c-card--elevated" style="margin-top:24px;">
+  <div class="c-card__header" style="flex-direction:row; align-items:center; justify-content:space-between;">
+    <div>
+      <h2 class="c-card__title">Monitoring</h2>
+      <p class="c-card__subtitle">Plan: <strong style="text-transform:capitalize;">{{ $mon.PlanName }}</strong></p>
+    </div>
+    {{ if ne $mon.Cadence "off" }}
+    <form method="post" action="/t/{{ $tenant.Slug }}/stores/{{ $s.ID }}/run-now" style="margin:0;">
+      <input type="hidden" name="_csrf" value="{{ $csrf }}">
+      <button type="submit" class="c-button c-button--tonal c-button--small"><span class="c-button__label">Run now</span></button>
+    </form>
+    {{ end }}
+  </div>
+  <div class="c-card__body">
+    <form method="post" action="/t/{{ $tenant.Slug }}/stores/{{ $s.ID }}/monitoring" style="margin:0;">
+      <input type="hidden" name="_csrf" value="{{ $csrf }}">
+      <fieldset class="c-cadence" style="border:0; padding:0; margin:0 0 12px;">
+        <legend style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--md-sys-color-on-surface-variant); margin-bottom:8px;">Cadence</legend>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          {{- range $c := $mon.AllCadences }}
+          {{- $allowed := false }}{{ range $a := $mon.AvailableCadences }}{{ if eq $a $c }}{{ $allowed = true }}{{ end }}{{ end }}
+          <label class="c-cadence__opt {{ if not $allowed }}c-cadence__opt--locked{{ end }}"
+                 {{ if not $allowed }}title="Upgrade your plan to unlock {{ $c }} monitoring"{{ end }}>
+            <input type="radio" name="cadence" value="{{ $c }}"
+                   {{ if eq $c $mon.Cadence }}checked{{ end }}
+                   {{ if not $allowed }}disabled{{ end }}>
+            <span class="c-cadence__label">{{ $c }}{{ if not $allowed }} 🔒{{ end }}</span>
+          </label>
+          {{- end }}
+        </div>
+      </fieldset>
+      <button type="submit" class="c-button c-button--filled c-button--small"><span class="c-button__label">Save cadence</span></button>
+    </form>
+
+    {{ if ne $mon.Cadence "off" }}
+    <p style="margin:16px 0 0; color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">
+      Next run {{ if $mon.NextRunAt }}<strong>{{ $mon.NextRunAt.Format "Jan 2 15:04" }}</strong>{{ else }}<strong>—</strong>{{ end }}
+      {{- if $mon.LastRunAt }} · last enqueue <strong>{{ $mon.LastRunAt.Format "Jan 2 15:04" }}</strong>{{ end }}
+    </p>
+    {{ end }}
+
+    <div style="margin-top:24px;">
+      <span style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--md-sys-color-on-surface-variant);">Score history (last 12)</span>
+      <div style="margin-top:6px;">{{ $mon.Trendline.SVG }}</div>
+    </div>
+  </div>
+</article>
+
+<article class="c-card c-card--outlined" style="margin-top:24px;">
+  <div class="c-card__header" style="flex-direction:row; align-items:center; justify-content:space-between;">
+    <div>
+      <h2 class="c-card__title">Google Merchant Center</h2>
+      <p class="c-card__subtitle">Pull account suspensions, item-level issues, and feed errors directly from Google.</p>
+    </div>
+    {{- if $gmc.HasConnection }}
+    <span class="c-pill c-pill--{{ $gmc.StatusVariant }}">{{ $gmc.StatusPill }}</span>
+    {{- end }}
+  </div>
+  <div class="c-card__body">
+    {{- if not $gmc.Configured }}
+    <p style="color:var(--md-sys-color-on-surface-variant);">
+      The Google OAuth client isn't configured on this server.
+      Set <code>GOOGLE_OAUTH_CLIENT_ID</code> and <code>GOOGLE_OAUTH_CLIENT_SECRET</code> to enable the connect flow.
+    </p>
+    {{- else if not $gmc.PlanAllows }}
+    <p>
+      Google Merchant Center integration is included on <strong>Starter</strong> and above.
+      Your plan: <strong>{{ $gmc.PlanLabel }}</strong>.
+    </p>
+    <a href="/pricing" class="c-button c-button--filled c-button--small"><span class="c-button__label">View plans</span></a>
+    {{- else if $gmc.HasConnection }}
+    <dl style="display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; margin:0 0 12px;">
+      <dt style="color:var(--md-sys-color-on-surface-variant);">Merchant ID</dt><dd><code>{{ $gmc.MerchantID }}</code></dd>
+      {{- if $gmc.AccountEmail }}<dt style="color:var(--md-sys-color-on-surface-variant);">Google account</dt><dd>{{ $gmc.AccountEmail }}</dd>{{ end }}
+      <dt style="color:var(--md-sys-color-on-surface-variant);">Last sync</dt><dd>{{ if $gmc.LastSyncAt }}{{ $gmc.LastSyncAt.Format "Jan 2 15:04" }}{{ else }}—{{ end }}</dd>
+      <dt style="color:var(--md-sys-color-on-surface-variant);">Website claimed</dt><dd>{{ if $gmc.WebsiteClaimed }}{{ if deref_bool $gmc.WebsiteClaimed }}yes{{ else }}<strong>no</strong>{{ end }}{{ else }}—{{ end }}</dd>
+    </dl>
+    <div style="display:flex; gap:16px; flex-wrap:wrap; margin:0 0 16px;">
+      <span class="c-pill c-pill--{{ if gt $gmc.SuspensionsCount 0 }}critical{{ else }}outlined{{ end }}">{{ $gmc.SuspensionsCount }} suspension{{ if ne $gmc.SuspensionsCount 1 }}s{{ end }}</span>
+      <span class="c-pill c-pill--{{ if gt $gmc.WarningsCount 0 }}warning{{ else }}outlined{{ end }}">{{ $gmc.WarningsCount }} warning{{ if ne $gmc.WarningsCount 1 }}s{{ end }}</span>
+    </div>
+    <form method="post" action="/t/{{ $tenant.Slug }}/stores/{{ $s.ID }}/gmc/disconnect" style="margin:0;">
+      <input type="hidden" name="_csrf" value="{{ $csrf }}">
+      <button type="submit" class="c-button c-button--outlined c-button--small" onclick="return confirm('Disconnect from Google Merchant Center? Future audits won't include GMC data.')"><span class="c-button__label">Disconnect</span></button>
+    </form>
+    {{- else }}
+    <p style="margin:0 0 12px;">Connect this store to Google Merchant Center to fold account warnings, item-level disapprovals, and feed errors into your audits.</p>
+    <a href="/t/{{ $tenant.Slug }}/stores/{{ $s.ID }}/gmc/connect" class="c-button c-button--filled">
+      <span class="c-button__label">Connect Google Merchant Center</span>
+    </a>
+    {{- end }}
+  </div>
+</article>
+
+<article class="c-card c-card--outlined" style="margin-top:24px;">
+  <div class="c-card__header">
+    <h2 class="c-card__title">Alert me when…</h2>
+    <p class="c-card__subtitle">Email alerts go to <strong>{{ $.User.Email }}</strong>.</p>
+  </div>
+  <div class="c-card__body">
+    <form method="post" action="/t/{{ $tenant.Slug }}/stores/{{ $s.ID }}/subscriptions" style="margin:0;">
+      <input type="hidden" name="_csrf" value="{{ $csrf }}">
+      <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;">
+        <li><label style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" name="on_new_critical" {{ if $mon.Subscription.OnNewCritical }}checked{{ end }}>
+          <span><strong>New critical issue</strong> — always sends, even if rate-limited.</span>
+        </label></li>
+        <li><label style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" name="on_score_drop" {{ if $mon.Subscription.OnScoreDrop }}checked{{ end }}>
+          <span><strong>Score drops</strong> by at least
+            <input type="number" name="score_drop_threshold" min="1" max="100" value="{{ $mon.Subscription.ScoreDropThreshold }}" style="width:64px; padding:2px 6px;">
+            points (rate-limited 1/24h).</span>
+        </label></li>
+        <li><label style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" name="on_audit_failed" {{ if $mon.Subscription.OnAuditFailed }}checked{{ end }}>
+          <span><strong>Audit fails</strong> — always sends.</span>
+        </label></li>
+        <li><label style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" name="on_gmc_account_change" {{ if $mon.Subscription.OnGMCChange }}checked{{ end }}>
+          <span><strong>GMC account change</strong> — when the linked Google Merchant Center account changes status.</span>
+        </label></li>
+      </ul>
+      <button type="submit" class="c-button c-button--filled c-button--small" style="margin-top:16px;"><span class="c-button__label">Save preferences</span></button>
+    </form>
+  </div>
+</article>
+
+{{ end }}
+{{ end }}

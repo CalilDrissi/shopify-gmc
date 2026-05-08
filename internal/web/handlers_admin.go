@@ -633,6 +633,121 @@ func (h *AdminHandlers) AuditLogPage(w http.ResponseWriter, r *http.Request) {
 	h.renderAdmin(w, r, "admin-audit-log", *d)
 }
 
+// GMCPage renders the platform-admin GMC overview: connections grouped by
+// status (active/warning/suspended/revoked/error), recent failed syncs,
+// rate-limit usage (count of recent error rows mentioning rate limit),
+// and reauth-required list (status=revoked).
+//
+// The query joins through tenants + stores so the page can show "which
+// tenant + which store" per row without N round-trips.
+func (h *AdminHandlers) GMCPage(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+
+	type connRow struct {
+		ID            uuid.UUID
+		TenantSlug    string
+		ShopDomain    string
+		MerchantID    string
+		Status        string // gmc_connection_status enum
+		AccountStatus *string
+		Warnings      int
+		Suspensions   int
+		LastSyncAt    *time.Time
+		LastSyncStatus *string
+		LastError     *string
+	}
+	rows, err := h.Pool.Query(r.Context(), `
+		SELECT c.id, t.slug, s.shop_domain, c.merchant_id, c.status::text,
+		       c.account_status, c.warnings_count, c.suspensions_count,
+		       c.last_sync_at, c.last_sync_status, c.last_error_message
+		FROM store_gmc_connections c
+		JOIN tenants t ON t.id = c.tenant_id
+		JOIN stores  s ON s.id = c.store_id
+		ORDER BY
+		  CASE c.status
+		    WHEN 'error' THEN 1
+		    WHEN 'expired' THEN 2
+		    WHEN 'revoked' THEN 3
+		    WHEN 'active' THEN 4
+		  END,
+		  c.suspensions_count DESC,
+		  c.warnings_count DESC,
+		  c.last_sync_at DESC NULLS LAST
+		LIMIT 500
+	`)
+	if err != nil {
+		http.Error(w, "query: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	var (
+		all []connRow
+		byStatus = map[string]int{} // active/warning/suspended/revoked/error
+		failed []connRow
+		reauth []connRow
+		rateLimited int
+	)
+	for rows.Next() {
+		var c connRow
+		if err := rows.Scan(&c.ID, &c.TenantSlug, &c.ShopDomain, &c.MerchantID, &c.Status,
+			&c.AccountStatus, &c.Warnings, &c.Suspensions, &c.LastSyncAt, &c.LastSyncStatus, &c.LastError); err != nil {
+			continue
+		}
+		// Bucket: revoked/expired/error keep their literal status; active is
+		// further split by account_status (warning/suspended) for the dashboard.
+		bucket := c.Status
+		if c.Status == "active" && c.AccountStatus != nil {
+			switch *c.AccountStatus {
+			case "warning":
+				bucket = "warning"
+			case "suspended":
+				bucket = "suspended"
+			default:
+				bucket = "active"
+			}
+		}
+		byStatus[bucket]++
+		if c.LastSyncStatus != nil && *c.LastSyncStatus == "error" {
+			failed = append(failed, c)
+			if c.LastError != nil && (containsAny(*c.LastError, "rate limit", "429")) {
+				rateLimited++
+			}
+		}
+		if c.Status == "revoked" || (c.LastError != nil && containsAny(*c.LastError, "401", "unauthorized", "Re-consent")) {
+			reauth = append(reauth, c)
+		}
+		all = append(all, c)
+	}
+
+	d.Title = "GMC overview"
+	d.Data = map[string]any{
+		"All":          all,
+		"ByStatus":     byStatus,
+		"Total":        len(all),
+		"FailedSyncs":  failed,
+		"RateLimited":  rateLimited,
+		"ReauthList":   reauth,
+	}
+	h.renderAdmin(w, r, "admin-gmc", *d)
+}
+
+// containsAny is a tiny helper — case-insensitive substring match against
+// any of the needles. Local to this file to avoid pulling strings into the
+// package's public surface.
+func containsAny(haystack string, needles ...string) bool {
+	low := strings.ToLower(haystack)
+	for _, n := range needles {
+		if strings.Contains(low, strings.ToLower(n)) {
+			return true
+		}
+	}
+	return false
+}
+
 func (h *AdminHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	d := h.adminCtx(r)
 	if d == nil || d.Admin.Role != "super" {
@@ -741,6 +856,8 @@ func (h *AdminHandlers) adminCtx(r *http.Request) *adminPageData {
 	}
 	// Sliding window: extend the session on every authenticated request.
 	_ = h.Sessions.Extend(r.Context(), sess.ID)
+	// Surface user_id + platform_admin_id on this request's log line.
+	recordIdentityToScope(r.Context(), user.ID.String(), "", admin.ID.String())
 	return &adminPageData{
 		Admin: &adminView{UserID: user.ID, Email: user.Email, Role: admin.Role},
 		CSRFToken: h.CSRF.TokenFor(sess.Token),

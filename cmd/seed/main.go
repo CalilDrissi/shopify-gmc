@@ -52,12 +52,18 @@ func main() {
 			log.Fatalf("grant: %v", err)
 		}
 		fmt.Printf("granted %s = %s (id=%s)\n", email, a.Role, a.ID)
+	case "all":
+		if err := seedAll(ctx, pool); err != nil {
+			log.Fatalf("seed all: %v", err)
+		}
 	default:
 		usage()
 	}
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: seed grant-admin <email> [super|admin|support]")
+	fmt.Fprintln(os.Stderr, "usage:")
+	fmt.Fprintln(os.Stderr, "  seed grant-admin <email> [super|admin|support]")
+	fmt.Fprintln(os.Stderr, "  seed all      # populate dev DB with realistic fixture data")
 	os.Exit(2)
 }

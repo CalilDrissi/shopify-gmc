@@ -1,0 +1,127 @@
+{{ define "content" }}
+{{ with .Data }}
+<header style="display:flex; align-items:baseline; justify-content:space-between; gap:16px;">
+  <h1 class="page-title" style="margin:0;">GMC overview</h1>
+  <p style="color:var(--md-sys-color-on-surface-variant); margin:0;">{{ .Total }} connection{{ if ne .Total 1 }}s{{ end }} across all tenants</p>
+</header>
+
+<section style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:16px;">
+  {{- $bs := .ByStatus -}}
+  <article class="c-card c-card--filled"><div class="c-card__body" style="text-align:center;">
+    <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Active</div>
+    <div style="font-size:2rem; font-weight:700; color:#1b873f;">{{ index $bs "active" }}</div>
+  </div></article>
+  <article class="c-card c-card--filled"><div class="c-card__body" style="text-align:center;">
+    <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Warning</div>
+    <div style="font-size:2rem; font-weight:700; color:#b76b00;">{{ index $bs "warning" }}</div>
+  </div></article>
+  <article class="c-card c-card--filled"><div class="c-card__body" style="text-align:center;">
+    <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Suspended</div>
+    <div style="font-size:2rem; font-weight:700; color:#b3261e;">{{ index $bs "suspended" }}</div>
+  </div></article>
+  <article class="c-card c-card--filled"><div class="c-card__body" style="text-align:center;">
+    <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Revoked</div>
+    <div style="font-size:2rem; font-weight:700; color:var(--md-sys-color-on-surface-variant);">{{ index $bs "revoked" }}</div>
+  </div></article>
+  <article class="c-card c-card--filled"><div class="c-card__body" style="text-align:center;">
+    <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Errored</div>
+    <div style="font-size:2rem; font-weight:700; color:#b3261e;">{{ index $bs "error" }}</div>
+  </div></article>
+  <article class="c-card c-card--filled"><div class="c-card__body" style="text-align:center;">
+    <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Rate limited</div>
+    <div style="font-size:2rem; font-weight:700; color:#b76b00;">{{ .RateLimited }}</div>
+  </div></article>
+</section>
+
+{{- if .ReauthList }}
+<article class="c-card c-card--outlined" style="margin-top:24px; border-color:#b3261e;">
+  <div class="c-card__header">
+    <h2 class="c-card__title" style="color:#b3261e;">Reauthorization required · {{ len .ReauthList }}</h2>
+    <p class="c-card__subtitle">These connections lost their refresh token. The owners have been emailed; reach out if a tenant doesn't reconnect.</p>
+  </div>
+  <div class="c-card__body">
+    <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:8px;">
+      {{- range .ReauthList }}
+      <li><code>{{ .TenantSlug }}</code> · {{ .ShopDomain }} · merchant <code>{{ .MerchantID }}</code>
+        {{ if .LastError }}<br><span style="color:var(--md-sys-color-on-surface-variant); font-size:0.85rem;">{{ deref .LastError }}</span>{{ end }}
+      </li>
+      {{- end }}
+    </ul>
+  </div>
+</article>
+{{- end }}
+
+{{- if .FailedSyncs }}
+<article class="c-card c-card--outlined" style="margin-top:24px;">
+  <div class="c-card__header">
+    <h2 class="c-card__title">Recent failed syncs · {{ len .FailedSyncs }}</h2>
+  </div>
+  <div class="c-card__body">
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="text-align:left; color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">
+          <th style="padding:8px 0;">Tenant</th>
+          <th style="padding:8px 0;">Store</th>
+          <th style="padding:8px 0;">Last sync</th>
+          <th style="padding:8px 0;">Error</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{- range .FailedSyncs }}
+        <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
+          <td style="padding:8px 0;"><code>{{ .TenantSlug }}</code></td>
+          <td style="padding:8px 0;">{{ .ShopDomain }}</td>
+          <td style="padding:8px 0;">{{ if .LastSyncAt }}{{ .LastSyncAt.Format "Jan 2 15:04" }}{{ else }}—{{ end }}</td>
+          <td style="padding:8px 0; color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">{{ if .LastError }}{{ deref .LastError }}{{ end }}</td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+  </div>
+</article>
+{{- end }}
+
+<article class="c-card c-card--outlined" style="margin-top:24px;">
+  <div class="c-card__header">
+    <h2 class="c-card__title">All connections</h2>
+  </div>
+  <div class="c-card__body">
+    {{- if .All }}
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="text-align:left; color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">
+          <th style="padding:8px 0;">Tenant</th>
+          <th style="padding:8px 0;">Store</th>
+          <th style="padding:8px 0;">Merchant</th>
+          <th style="padding:8px 0;">Status</th>
+          <th style="padding:8px 0;">Account</th>
+          <th style="padding:8px 0;">Warn</th>
+          <th style="padding:8px 0;">Susp</th>
+          <th style="padding:8px 0;">Last sync</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{- range .All }}
+        <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
+          <td style="padding:8px 0;"><code>{{ .TenantSlug }}</code></td>
+          <td style="padding:8px 0;">{{ .ShopDomain }}</td>
+          <td style="padding:8px 0;"><code>{{ .MerchantID }}</code></td>
+          <td style="padding:8px 0;">
+            <span class="c-pill c-pill--{{ if eq .Status `active` }}success{{ else if eq .Status `revoked` }}outlined{{ else }}critical{{ end }}">{{ .Status }}</span>
+          </td>
+          <td style="padding:8px 0; text-transform:capitalize;">{{ if .AccountStatus }}{{ deref .AccountStatus }}{{ else }}—{{ end }}</td>
+          <td style="padding:8px 0;">{{ .Warnings }}</td>
+          <td style="padding:8px 0;">{{ .Suspensions }}</td>
+          <td style="padding:8px 0; color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">{{ if .LastSyncAt }}{{ .LastSyncAt.Format "Jan 2 15:04" }}{{ else }}never{{ end }}</td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+    {{- else }}
+    <p style="color:var(--md-sys-color-on-surface-variant);">No GMC connections yet.</p>
+    {{- end }}
+  </div>
+</article>
+
+{{ end }}
+{{ end }}

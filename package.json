@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "alpinejs": "^3.15.12",
+    "htmx.org": "^2.0.10",
     "otplib": "^12.0.1",
     "playwright": "^1.59.1",
     "sass": "^1.81.0"

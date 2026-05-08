@@ -1,0 +1,100 @@
+{{- /*
+  issue-card — one issue with severity pill, why-it-matters, current value,
+  AI suggested fix (copy-to-clipboard via Alpine), expandable how-to-apply
+  steps, optional resolve form.
+
+  Input: dict "Issue" issueView "Tenant" tenant "AuditID" uuid "CSRFToken" str "PrintMode" bool
+*/ -}}
+{{ define "issue-card" -}}
+{{- $i := .Issue -}}
+{{- $print := .PrintMode -}}
+<article class="c-issue" id="issue-{{ $i.ID }}" x-data="{ copied:false, expanded:false }">
+  <header class="c-issue__head">
+    <div class="c-issue__head-main">
+      <span class="c-pill c-pill--{{ if eq $i.Severity `critical` }}critical{{ else if eq $i.Severity `error` }}critical{{ else if eq $i.Severity `warning` }}warning{{ else }}outlined{{ end }}">{{ $i.Severity }}</span>
+      <h3 class="c-issue__title">{{ $i.Title }}</h3>
+    </div>
+    <code class="c-issue__rule">{{ $i.RuleCode }}</code>
+  </header>
+
+  {{- if or $i.ProductTitle $i.URL }}
+  <p class="c-issue__target">
+    {{- if $i.ProductTitle }}<strong>{{ $i.ProductTitle }}</strong>{{ end -}}
+    {{- if $i.URL }}<a href="{{ $i.URL }}" rel="noopener" target="_blank">{{ $i.URL }}</a>{{ end -}}
+  </p>
+  {{- end }}
+
+  {{- if $i.Detail }}
+  <div class="c-issue__row">
+    <span class="c-issue__row-label">Current value</span>
+    <p class="c-issue__row-text">{{ $i.Detail }}</p>
+  </div>
+  {{- end }}
+
+  {{- if $i.WhyItMatters }}
+  <div class="c-issue__row">
+    <span class="c-issue__row-label">Why it matters</span>
+    <p class="c-issue__row-text">{{ $i.WhyItMatters }}</p>
+  </div>
+  {{- end }}
+
+  {{- if $i.Suggestion }}
+  <div class="c-issue__row c-issue__row--ai">
+    <span class="c-issue__row-label">AI-suggested fix</span>
+    <div class="c-issue__ai-body">
+      <p class="c-issue__row-text" x-ref="aiSuggestion">{{ $i.Suggestion }}</p>
+      {{- if not $print }}
+      <button type="button" class="c-button c-button--text c-button--small"
+              @click="navigator.clipboard.writeText($refs.aiSuggestion.innerText).then(() => { copied = true; setTimeout(() => copied = false, 1500) })">
+        <span class="c-button__label" x-text="copied ? 'Copied' : 'Copy'"></span>
+      </button>
+      {{- end }}
+    </div>
+  </div>
+  {{- end }}
+
+  {{- if $i.Steps }}
+  <div class="c-issue__how">
+    {{- if $print }}
+    <h4 class="c-issue__how-heading">How to apply{{ if $i.TimeEstimate }} · {{ $i.TimeEstimate }}{{ end }}{{ if $i.Difficulty }} · {{ $i.Difficulty }}{{ end }}</h4>
+    {{- else }}
+    <button type="button" class="c-issue__how-toggle" @click="expanded = !expanded" :aria-expanded="expanded.toString()">
+      <span x-text="expanded ? '▾' : '▸'">▸</span>
+      <span>How to apply</span>
+      {{- if $i.TimeEstimate }}<span class="c-issue__how-meta">· {{ $i.TimeEstimate }}</span>{{ end }}
+      {{- if $i.Difficulty }}<span class="c-issue__how-meta">· {{ $i.Difficulty }}</span>{{ end }}
+    </button>
+    {{- end }}
+    <ol class="c-issue__steps" {{ if not $print }}x-show="expanded" x-cloak{{ end }}>
+      {{- range $i.Steps }}
+      <li>
+        <strong>{{ .Action }}</strong>
+        {{- if .Path }} <code>{{ .Path }}</code>{{ end }}
+        {{- if .Detail }}<p>{{ .Detail }}</p>{{ end }}
+      </li>
+      {{- end }}
+    </ol>
+    {{- if $i.DocsURL }}
+    <p class="c-issue__docs" {{ if not $print }}x-show="expanded" x-cloak{{ end }}>
+      <a href="{{ $i.DocsURL }}" rel="noopener" target="_blank">Reference documentation →</a>
+    </p>
+    {{- end }}
+  </div>
+  {{- end }}
+
+  {{- if not $print }}
+  <footer class="c-issue__foot">
+    {{- if $i.FixAppliedAt }}
+    <span class="c-issue__resolved">✓ Marked resolved {{ $i.FixAppliedAt.Format "Jan 2" }}</span>
+    {{- else }}
+    <form method="post" action="/t/{{ .Tenant.Slug }}/audits/{{ .AuditID }}/issues/{{ $i.ID }}/resolve" style="margin:0;">
+      <input type="hidden" name="_csrf" value="{{ .CSRFToken }}">
+      <button type="submit" class="c-button c-button--outlined c-button--small">
+        <span class="c-button__label">Mark resolved</span>
+      </button>
+    </form>
+    {{- end }}
+  </footer>
+  {{- end }}
+</article>
+{{- end }}

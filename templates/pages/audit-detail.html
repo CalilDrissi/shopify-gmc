@@ -1,0 +1,227 @@
+{{ define "content" }}
+{{- $tenant := .Tenant -}}
+{{- $csrf := .CSRFToken -}}
+{{ with .Data }}
+{{- $audit := . -}}
+<header style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+  <div>
+    <h1 class="page-title" style="margin:0;">Audit · {{ .StoreName }}</h1>
+    <p style="color:var(--md-sys-color-on-surface-variant); margin:4px 0 0;">
+      ID <code>{{ .ID }}</code> · trigger {{ .Trigger }}
+      {{- if .StartedAt }} · started {{ .StartedAt.Format "Jan 2 15:04:05" }}{{ end -}}
+      {{- if .FinishedAt }} · finished {{ .FinishedAt.Format "15:04:05" }}{{ end }}
+    </p>
+  </div>
+  <div style="display:flex; gap:8px;">
+    {{- if eq .Status "succeeded" }}
+    <a href="/t/{{ $.Tenant.Slug }}/audits/{{ .ID }}/report.pdf" class="c-button c-button--filled">
+      <span class="c-button__label">Download PDF</span>
+    </a>
+    {{- end }}
+    <a href="/t/{{ $.Tenant.Slug }}/audits" class="c-button c-button--text"><span class="c-button__label">All audits</span></a>
+  </div>
+</header>
+
+{{- if ne .Status "succeeded" }}
+{{ template "audit-progress-fragment" (dict "Audit" . "Tenant" $tenant "CSRFToken" $csrf) }}
+{{- end }}
+
+{{- if eq .Status "succeeded" }}
+<section class="c-report" style="margin-top:24px;">
+  {{- if .Diff }}
+  {{- $delta := .Diff.ScoreDelta -}}
+  <article class="c-card c-card--outlined c-changes">
+    <div class="c-card__header" style="flex-direction:row; align-items:center; justify-content:space-between;">
+      <h2 class="c-card__title">Changes since last audit</h2>
+      <span class="c-changes__delta c-changes__delta--{{ if lt $delta 0 }}down{{ else if gt $delta 0 }}up{{ else }}flat{{ end }}">
+        {{- if lt $delta 0 }}▼{{ else if gt $delta 0 }}▲{{ else }}—{{ end }}
+        {{- if gt $delta 0 }}+{{ end }}{{ $delta }}
+      </span>
+    </div>
+    <div class="c-card__body">
+      <div style="display:flex; gap:16px; flex-wrap:wrap;">
+        <span class="c-pill c-pill--critical">+{{ .Diff.NewCount }} new</span>
+        {{- if gt .Diff.NewCriticalCount 0 }}<span class="c-pill c-pill--critical">{{ .Diff.NewCriticalCount }} new critical</span>{{ end }}
+        <span class="c-pill c-pill--success">−{{ .Diff.ResolvedCount }} resolved</span>
+      </div>
+      {{- if .Diff.NewIssues }}
+      <h3 style="margin:16px 0 6px; font-size:0.95rem;">New issues</h3>
+      <ul style="margin:0; padding-left:20px; display:flex; flex-direction:column; gap:4px;">
+        {{- range .Diff.NewIssues }}
+        <li>
+          <span class="c-pill c-pill--{{ if eq .Severity `critical` }}critical{{ else if eq .Severity `error` }}critical{{ else if eq .Severity `warning` }}warning{{ else }}outlined{{ end }}" style="font-size:0.7rem;">{{ .Severity }}</span>
+          <strong>{{ .Title }}</strong>
+          {{- if .ProductTitle }} <span style="color:var(--md-sys-color-on-surface-variant);">on {{ .ProductTitle }}</span>{{ end }}
+        </li>
+        {{- end }}
+      </ul>
+      {{- end }}
+    </div>
+  </article>
+  {{- end }}
+
+  <article class="c-card c-card--elevated">
+    <div class="c-card__body">
+      <div class="c-report__hero">
+        {{ template "score-gauge" (dict "Score" (derefInt .Score) "Risk" (deref .RiskLevel)) }}
+        <div>
+          {{ if .Summary }}<p style="margin:0 0 12px;">{{ deref .Summary }}</p>{{ end }}
+          <div class="c-report__counts">
+            <span class="c-pill c-pill--critical">{{ index .IssueCounts "critical" }} critical</span>
+            <span class="c-pill c-pill--critical">{{ index .IssueCounts "error" }} error</span>
+            <span class="c-pill c-pill--warning">{{ index .IssueCounts "warning" }} warning</span>
+            <span class="c-pill c-pill--outlined">{{ index .IssueCounts "info" }} info</span>
+          </div>
+          {{- if .NextSteps }}
+          <h3 style="margin:20px 0 8px;">Next steps</h3>
+          <ol style="margin:0 0 0 20px;">
+            {{- range .NextSteps }}<li>{{ . }}</li>{{ end }}
+          </ol>
+          {{- end }}
+        </div>
+      </div>
+    </div>
+  </article>
+
+  {{- if .IssueGroups }}
+  {{- if .GMC }}
+  {{- /* Tabbed view: Crawler / GMC / Timeline */ -}}
+  <section x-data="{ tab: 'crawler' }" class="c-tabs">
+    <h2 style="margin:0 0 12px;">Issues found · {{ .IssueCount }}</h2>
+    <div class="c-tabs__bar" role="tablist">
+      <button type="button" :class="tab==='crawler' && 'c-tabs__tab--active'" class="c-tabs__tab" @click="tab='crawler'">Crawler findings <span class="c-tabs__count">{{ .GMC.CrawlerCount }}</span></button>
+      <button type="button" :class="tab==='gmc' && 'c-tabs__tab--active'" class="c-tabs__tab" @click="tab='gmc'">From Google Merchant Center <span class="c-tabs__count">{{ .GMC.GMCCount }}</span></button>
+      <button type="button" :class="tab==='timeline' && 'c-tabs__tab--active'" class="c-tabs__tab" @click="tab='timeline'">Timeline <span class="c-tabs__count">{{ len .GMC.Timeline }}</span></button>
+    </div>
+
+    <div x-show="tab==='crawler'" class="c-tabs__panel">
+      {{- if .GMC.CrawlerGroups }}
+      {{- range .GMC.CrawlerGroups }}
+      <div class="c-issue-group">
+        <header class="c-issue-group__head">
+          <h2>{{ .Category }}</h2>
+          <span class="c-issue-group__count">{{ len .Issues }} issue{{ if ne (len .Issues) 1 }}s{{ end }}</span>
+        </header>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          {{- range .Issues }}
+          {{ template "issue-card" (dict "Issue" . "Tenant" $tenant "AuditID" $audit.ID "CSRFToken" $csrf "PrintMode" false) }}
+          {{- end }}
+        </div>
+      </div>
+      {{- end }}
+      {{- else }}
+      <p style="color:var(--md-sys-color-on-surface-variant); padding:16px 0;">No crawler issues for this audit.</p>
+      {{- end }}
+    </div>
+
+    <div x-show="tab==='gmc'" x-cloak class="c-tabs__panel">
+      <article class="c-card c-card--filled" style="margin-bottom:16px;">
+        <div class="c-card__body">
+          <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:center;">
+            <div>
+              <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Account status</div>
+              <div style="font-size:1.25rem; font-weight:700; text-transform:capitalize;">{{ .GMC.AccountStatus }}</div>
+            </div>
+            <div>
+              <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Merchant ID</div>
+              <div><code>{{ .GMC.MerchantID }}</code></div>
+            </div>
+            <div>
+              <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Products tracked</div>
+              <div>{{ .GMC.ProductCount }}</div>
+            </div>
+            <div>
+              <div style="font-size:0.75rem; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant);">Website claimed</div>
+              <div>{{ if .GMC.WebsiteClaimed }}{{ if deref_bool .GMC.WebsiteClaimed }}yes{{ else }}<strong style="color:#b3261e;">no</strong>{{ end }}{{ else }}—{{ end }}</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <span class="c-pill c-pill--{{ if gt .GMC.SuspensionsCount 0 }}critical{{ else }}outlined{{ end }}">{{ .GMC.SuspensionsCount }} suspension{{ if ne .GMC.SuspensionsCount 1 }}s{{ end }}</span>
+              <span class="c-pill c-pill--{{ if gt .GMC.WarningsCount 0 }}warning{{ else }}outlined{{ end }}">{{ .GMC.WarningsCount }} warning{{ if ne .GMC.WarningsCount 1 }}s{{ end }}</span>
+            </div>
+          </div>
+        </div>
+      </article>
+      {{- if .GMC.GMCGroups }}
+      {{- range .GMC.GMCGroups }}
+      <div class="c-issue-group">
+        <header class="c-issue-group__head">
+          <h2>{{ .Category }}</h2>
+          <span class="c-issue-group__count">{{ len .Issues }} issue{{ if ne (len .Issues) 1 }}s{{ end }}</span>
+        </header>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          {{- range .Issues }}
+          {{ template "issue-card" (dict "Issue" . "Tenant" $tenant "AuditID" $audit.ID "CSRFToken" $csrf "PrintMode" false) }}
+          {{- end }}
+        </div>
+      </div>
+      {{- end }}
+      {{- else }}
+      <p style="color:var(--md-sys-color-on-surface-variant); padding:16px 0;">No issues reported by Google for this audit.</p>
+      {{- end }}
+    </div>
+
+    <div x-show="tab==='timeline'" x-cloak class="c-tabs__panel">
+      {{- if .GMC.Timeline }}
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="text-align:left; color:var(--md-sys-color-on-surface-variant); font-size:0.875rem;">
+            <th style="padding:8px 0;">When</th>
+            <th style="padding:8px 0;">Account status</th>
+            <th style="padding:8px 0;">Suspensions</th>
+            <th style="padding:8px 0;">Warnings</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{- range .GMC.Timeline }}
+          <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
+            <td style="padding:10px 0;">{{ .CapturedAt.Format "Jan 2 15:04" }}</td>
+            <td style="padding:10px 0;">
+              <span class="c-pill c-pill--{{ if eq .AccountStatus `suspended` }}critical{{ else if eq .AccountStatus `warning` }}warning{{ else if eq .AccountStatus `active` }}success{{ else }}outlined{{ end }}">{{ if .AccountStatus }}{{ .AccountStatus }}{{ else }}—{{ end }}</span>
+            </td>
+            <td style="padding:10px 0;">{{ .SuspensionsCount }}</td>
+            <td style="padding:10px 0;">{{ .WarningsCount }}</td>
+            <td style="padding:10px 0; text-align:right;">
+              {{- if .AuditID }}<a class="c-button c-button--text c-button--small" href="/t/{{ $tenant.Slug }}/audits/{{ .AuditID }}"><span class="c-button__label">Open</span></a>{{ end }}
+            </td>
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+      {{- else }}
+      <p style="color:var(--md-sys-color-on-surface-variant); padding:16px 0;">No 90-day account history yet.</p>
+      {{- end }}
+    </div>
+  </section>
+  {{- else }}
+  {{- /* No GMC connection — flat report. */ -}}
+  <section>
+    <h2 style="margin:0 0 16px;">Issues found · {{ .IssueCount }}</h2>
+    {{- range .IssueGroups }}
+    <div class="c-issue-group">
+      <header class="c-issue-group__head">
+        <h2>{{ .Category }}</h2>
+        <span class="c-issue-group__count">{{ len .Issues }} issue{{ if ne (len .Issues) 1 }}s{{ end }}</span>
+      </header>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        {{- range .Issues }}
+        {{ template "issue-card" (dict
+            "Issue" .
+            "Tenant" $tenant
+            "AuditID" $audit.ID
+            "CSRFToken" $csrf
+            "PrintMode" false) }}
+        {{- end }}
+      </div>
+    </div>
+    {{- end }}
+  </section>
+  {{- end }}
+  {{- end }}
+
+  {{ template "audit-progress-fragment" (dict "Audit" . "Tenant" $tenant "CSRFToken" $csrf) }}
+</section>
+{{- end }}
+
+{{ end }}
+{{ end }}

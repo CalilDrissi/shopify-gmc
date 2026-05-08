@@ -1,4 +1,5 @@
 {{ define "content" }}
+{{- $tenant := .Tenant -}}
 <h1 class="page-title">Dashboard</h1>
 <article class="c-card c-card--elevated">
   <div class="c-card__header">
@@ -6,11 +7,36 @@
     <p class="c-card__subtitle">{{ .Tenant.Name }} · {{ .Tenant.Plan }} plan</p>
   </div>
   <div class="c-card__body">
-    <p>This is a placeholder dashboard. Connect a Shopify store to start auditing.</p>
+    <p>Connect a Shopify store to start auditing.</p>
     <p style="margin-top:16px;">
       <span class="c-pill c-pill--success">✓ Email verified</span>
       <span class="c-pill c-pill--filled">Owner</span>
     </p>
   </div>
 </article>
+
+{{- with .Data }}
+{{- with .GMC }}
+<article class="c-card c-card--outlined" style="margin-top:24px;">
+  <div class="c-card__header">
+    <h2 class="c-card__title">Google Merchant Center</h2>
+  </div>
+  <div class="c-card__body">
+    <p style="margin:0 0 12px;">
+      <strong>{{ .Connected }}</strong> of <strong>{{ .TotalStores }}</strong> store{{ if ne .TotalStores 1 }}s{{ end }} connected to GMC.
+      {{ if gt .WithWarnings 0 }}<strong style="color:#b76b00;">{{ .WithWarnings }}</strong> with active warnings.{{ end }}
+      {{ if gt .WithSuspensions 0 }}<strong style="color:#b3261e;">{{ .WithSuspensions }}</strong> suspended.{{ end }}
+    </p>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <span class="c-pill c-pill--{{ if gt .WithSuspensions 0 }}critical{{ else }}outlined{{ end }}">{{ .WithSuspensions }} suspended</span>
+      <span class="c-pill c-pill--{{ if gt .WithWarnings 0 }}warning{{ else }}outlined{{ end }}">{{ .WithWarnings }} with warnings</span>
+      <span class="c-pill c-pill--success">{{ .Connected }} connected</span>
+    </div>
+    <p style="margin:16px 0 0;">
+      <a href="/t/{{ $tenant.Slug }}/stores" class="c-button c-button--text c-button--small"><span class="c-button__label">Open Stores →</span></a>
+    </p>
+  </div>
+</article>
+{{- end }}
+{{- end }}
 {{ end }}

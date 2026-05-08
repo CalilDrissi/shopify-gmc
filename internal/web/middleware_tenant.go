@@ -84,7 +84,9 @@ func LoadTenantBySlug(pool *pgxpool.Pool, st *store.Store, render404 func(http.R
 				render404(w, r)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(WithTenant(r.Context(), t)))
+			ctx := WithTenant(r.Context(), t)
+			recordIdentityToScope(ctx, "", t.ID.String(), "")
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
