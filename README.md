@@ -3,6 +3,10 @@
 Multi-tenant SaaS that audits Shopify stores against Google Merchant Center
 (GMC) compliance rules and proposes AI-generated fixes.
 
+> **Operating the live deployment?** Start here:
+> [`guide/`](./guide/) — credentials, mail management, deploys,
+> troubleshooting. This README is for developers reading the codebase.
+
 - **Crawler-side checks** — 20 deterministic rules that read HTML/JSON-LD
   (HTTPS, structured data, policy pages, schema completeness, image alts,
   canonical tags, etc.) and produce one issue per failure.
