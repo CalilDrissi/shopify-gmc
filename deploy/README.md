@@ -55,6 +55,30 @@ same box.
   Gmail flags outbound as suspicious. On Contabo this lives in the
   customer panel under "Reverse DNS" for the VPS.
 
+- **`webmail.sh`** — turns the outbound-only Postfix from `smtp.sh`
+  into a full mail host: extends Postfix to accept inbound for
+  `@shopifygmc.com` (virtual mailboxes), installs Dovecot for IMAPS +
+  LMTP delivery + SASL bridge, installs Roundcube fronted by Caddy at
+  `https://mail.shopifygmc.com`, and adds a Postfix submission service
+  on port 587 for the webmail to send through.
+
+  After the script runs:
+  - **Add a mailbox**: hash a password with `doveadm pw -s ARGON2ID`,
+    append `email:hash:5000:5000::/var/mail/vmail/<domain>/<local>::`
+    to `/etc/dovecot/users`, then create the Maildir at
+    `/var/mail/vmail/<domain>/<local>/` owned `vmail:vmail`.
+  - **Aliases** (catch-all to admin) live in `/etc/postfix/virtual` —
+    edit + run `postmap /etc/postfix/virtual` after.
+  - **Webmail** at `https://mail.shopifygmc.com`. Login with the full
+    address and the Dovecot password.
+
+  DNS additions this script depends on: `mail.shopifygmc.com` A → the
+  box, MX `shopifygmc.com` → `mail.shopifygmc.com priority 10`, and
+  update SPF to include `mx` (`v=spf1 mx ip4:62.169.16.57 -all`).
+
+  The script disables apache2 (Roundcube's deb pulls it in but it
+  conflicts with Caddy on port 80).
+
 ## Layout on the box
 
 ```
