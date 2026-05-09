@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseSizeBytes(t *testing.T) {
@@ -281,5 +282,202 @@ func TestParseImportCSV_RowCap(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "too many") {
 		t.Errorf("expected 'too many' error, got %q", err.Error())
+	}
+}
+
+// Real Postfix mail.log snippets. Two flows, both for support@shopifygmc.com:
+//   D438583FE1: outbound, support@ → alice@example.org, sent (2.0.0)
+//   D5E1183FE2: inbound,  bob@example.net → support@, deferred 4.7.1
+// Plus an unrelated flow for someone-else@ that must NOT appear in results.
+const fixtureMailLog = `May  9 12:34:56 mail postfix/smtpd[12345]: D438583FE1: client=localhost[127.0.0.1]
+May  9 12:34:56 mail postfix/cleanup[12346]: D438583FE1: message-id=<abc@shopifygmc.com>
+May  9 12:34:56 mail postfix/qmgr[12347]: D438583FE1: from=<support@shopifygmc.com>, size=4242, nrcpt=1 (queue active)
+May  9 12:34:57 mail postfix/smtp[12348]: D438583FE1: to=<alice@example.org>, relay=mx.example.org[1.2.3.4]:25, delay=0.7, delays=0.1/0/0.3/0.3, dsn=2.0.0, status=sent (250 2.0.0 OK)
+May  9 12:34:57 mail postfix/qmgr[12347]: D438583FE1: removed
+May  9 12:36:00 mail postfix/smtpd[12350]: D5E1183FE2: client=relay.example.net[5.6.7.8]
+May  9 12:36:00 mail postfix/cleanup[12351]: D5E1183FE2: message-id=<def@example.net>
+May  9 12:36:00 mail postfix/qmgr[12352]: D5E1183FE2: from=<bob@example.net>, size=8181, nrcpt=1 (queue active)
+May  9 12:36:01 mail postfix/lmtp[12353]: D5E1183FE2: to=<support@shopifygmc.com>, relay=127.0.0.1[127.0.0.1]:24, delay=1.0, dsn=4.7.1, status=deferred (host 127.0.0.1[127.0.0.1] said: 451 4.7.1 try later)
+May  9 12:40:00 mail postfix/smtpd[12360]: E11183FE3A: client=localhost[127.0.0.1]
+May  9 12:40:00 mail postfix/qmgr[12361]: E11183FE3A: from=<someone-else@shopifygmc.com>, size=999, nrcpt=1 (queue active)
+May  9 12:40:01 mail postfix/smtp[12362]: E11183FE3A: to=<carol@example.com>, relay=mx.example.com[9.9.9.9]:25, dsn=2.0.0, status=sent (250 OK)
+`
+
+func TestParseMailLog(t *testing.T) {
+	lines := strings.Split(strings.TrimRight(fixtureMailLog, "\n"), "\n")
+	events := parseMailLog(lines, "support@shopifygmc.com", 200)
+	if len(events) != 2 {
+		t.Fatalf("got %d events, want 2 (filtered to support@)", len(events))
+	}
+
+	// Sorted descending by timestamp → the deferred inbound (12:36) comes first.
+	in := events[0]
+	if in.QueueID != "D5E1183FE2" {
+		t.Errorf("first event qid=%q, want D5E1183FE2", in.QueueID)
+	}
+	if in.Direction != "in" {
+		t.Errorf("first event direction=%q, want in", in.Direction)
+	}
+	if in.Counterparty != "bob@example.net" {
+		t.Errorf("first event counterparty=%q, want bob@example.net", in.Counterparty)
+	}
+	if in.From != "bob@example.net" {
+		t.Errorf("first event from=%q, want bob@example.net", in.From)
+	}
+	if in.SizeBytes != 8181 {
+		t.Errorf("first event size=%d, want 8181", in.SizeBytes)
+	}
+	if in.Status != "deferred" {
+		t.Errorf("first event status=%q, want deferred", in.Status)
+	}
+	if in.DSN != "4.7.1" {
+		t.Errorf("first event dsn=%q, want 4.7.1", in.DSN)
+	}
+
+	out := events[1]
+	if out.QueueID != "D438583FE1" {
+		t.Errorf("second event qid=%q, want D438583FE1", out.QueueID)
+	}
+	if out.Direction != "out" {
+		t.Errorf("second event direction=%q, want out", out.Direction)
+	}
+	if out.Counterparty != "alice@example.org" {
+		t.Errorf("second event counterparty=%q, want alice@example.org", out.Counterparty)
+	}
+	if out.Status != "sent" {
+		t.Errorf("second event status=%q, want sent", out.Status)
+	}
+	if out.DSN != "2.0.0" {
+		t.Errorf("second event dsn=%q, want 2.0.0", out.DSN)
+	}
+	if out.SizeBytes != 4242 {
+		t.Errorf("second event size=%d, want 4242", out.SizeBytes)
+	}
+}
+
+func TestParseMailLog_FilterMissesUnrelated(t *testing.T) {
+	lines := strings.Split(strings.TrimRight(fixtureMailLog, "\n"), "\n")
+	for _, qid := range []string{"E11183FE3A"} {
+		evs := parseMailLog(lines, "support@shopifygmc.com", 200)
+		for _, e := range evs {
+			if e.QueueID == qid {
+				t.Errorf("unrelated qid %s leaked into support@ results", qid)
+			}
+		}
+	}
+	// Carol IS the recipient of the third flow → should match for her.
+	evs := parseMailLog(lines, "carol@example.com", 200)
+	if len(evs) != 1 || evs[0].QueueID != "E11183FE3A" {
+		t.Errorf("expected one event for carol@, got %+v", evs)
+	}
+}
+
+func TestParseMailLog_RFC3339Header(t *testing.T) {
+	// Newer Postfix builds (or journald-injected) emit an RFC3339 timestamp.
+	rfc := strings.Join([]string{
+		"2026-05-09T12:34:56.123456+00:00 mail postfix/qmgr[1]: ABCDEF01: from=<a@x.com>, size=10, nrcpt=1 (queue active)",
+		"2026-05-09T12:34:57.000000+00:00 mail postfix/smtp[2]: ABCDEF01: to=<b@y.com>, relay=mx, dsn=2.0.0, status=sent (250 OK)",
+	}, "\n")
+	evs := parseMailLog(strings.Split(rfc, "\n"), "a@x.com", 10)
+	if len(evs) != 1 {
+		t.Fatalf("got %d, want 1", len(evs))
+	}
+	if evs[0].Status != "sent" || evs[0].Direction != "out" {
+		t.Errorf("got %+v, want status=sent direction=out", evs[0])
+	}
+	want := time.Date(2026, 5, 9, 12, 34, 57, 0, time.UTC)
+	if !evs[0].Timestamp.Equal(want) {
+		t.Errorf("timestamp = %v, want %v", evs[0].Timestamp, want)
+	}
+}
+
+func TestParseMailLog_EmptyEmail(t *testing.T) {
+	lines := strings.Split(fixtureMailLog, "\n")
+	if got := parseMailLog(lines, "", 200); got != nil {
+		t.Errorf("empty email should return nil, got %+v", got)
+	}
+}
+
+func TestParseMailLog_Cap(t *testing.T) {
+	// Build 5 flows for the same address, ask for a cap of 2 → return only 2.
+	var b strings.Builder
+	for i := 0; i < 5; i++ {
+		qid := []string{"AAAA0001", "AAAA0002", "AAAA0003", "AAAA0004", "AAAA0005"}[i]
+		ts := []string{"May  9 12:30:0", "May  9 12:31:0", "May  9 12:32:0", "May  9 12:33:0", "May  9 12:34:0"}[i] + "0"
+		b.WriteString(ts + " mail postfix/qmgr[1]: " + qid + ": from=<x@y.com>, size=10, nrcpt=1 (queue active)\n")
+		b.WriteString(ts + " mail postfix/smtp[2]: " + qid + ": to=<dest@z.com>, relay=mx, dsn=2.0.0, status=sent (250 OK)\n")
+	}
+	evs := parseMailLog(strings.Split(strings.TrimRight(b.String(), "\n"), "\n"), "x@y.com", 2)
+	if len(evs) != 2 {
+		t.Fatalf("cap not enforced: got %d, want 2", len(evs))
+	}
+	// Sorted descending → newest two are AAAA0005 and AAAA0004.
+	if evs[0].QueueID != "AAAA0005" || evs[1].QueueID != "AAAA0004" {
+		t.Errorf("got qids %s,%s — want AAAA0005,AAAA0004", evs[0].QueueID, evs[1].QueueID)
+	}
+}
+
+func TestReadMailLogTail_Small(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "mail.log")
+	body := "line one\nline two\nline three\n"
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lines, err := readMailLogTail(p, 1024*1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != 3 || lines[0] != "line one" || lines[2] != "line three" {
+		t.Errorf("got %v", lines)
+	}
+}
+
+func TestReadMailLogTail_TruncatesLargeFile(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "mail.log")
+	// Write 200 KB; cap read at 50 KB. Last several lines must survive; the
+	// first (partial) line after the seek must be dropped.
+	var sb strings.Builder
+	for i := 0; i < 4000; i++ {
+		sb.WriteString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n") // 46 bytes
+	}
+	if err := os.WriteFile(p, []byte(sb.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lines, err := readMailLogTail(p, 50*1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) == 0 {
+		t.Fatal("got 0 lines from a 200 KB file with 50 KB cap")
+	}
+	// Each surviving line must be the full 45-character "aaa..." string.
+	for i, l := range lines {
+		if l != strings.Repeat("a", 45) {
+			t.Fatalf("line %d corrupt (partial-line drop failed): %q", i, l)
+		}
+	}
+}
+
+func TestParseMailLogTimestamp(t *testing.T) {
+	now := time.Date(2026, 5, 9, 13, 0, 0, 0, time.UTC)
+	cases := []struct {
+		in   string
+		want time.Time
+	}{
+		{"May  9 12:34:56", time.Date(2026, 5, 9, 12, 34, 56, 0, time.UTC)},
+		// Future month → roll back to last year.
+		{"Dec 31 23:59:59", time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC)},
+		{"2026-05-09T12:34:56+00:00", time.Date(2026, 5, 9, 12, 34, 56, 0, time.UTC)},
+	}
+	for _, c := range cases {
+		got := parseMailLogTimestamp(c.in, now)
+		if !got.Equal(c.want) {
+			t.Errorf("parseMailLogTimestamp(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+	if got := parseMailLogTimestamp("not a timestamp", now); !got.IsZero() {
+		t.Errorf("expected zero time for bogus input, got %v", got)
 	}
 }

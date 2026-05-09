@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 )
 
 // MailAdmin paths. The wrapper script lives at /usr/local/bin/mailbox
@@ -29,6 +31,11 @@ const (
 	// `email,password,quota` (~80 chars each).
 	maxImportRows      = 1000
 	maxImportUploadMem = 8 << 20
+
+	mailLogPath        = "/var/log/mail.log"
+	mailLogTailMax     = int64(100 * 1024 * 1024) // read at most last 100 MiB
+	mailActivityCap    = 200
+	mailActivityCacheT = 5 * time.Second
 )
 
 var (
@@ -267,6 +274,288 @@ func (h *AdminHandlers) MailQuota(w http.ResponseWriter, r *http.Request) {
 		display = "default"
 	}
 	mailRedirect(w, r, "quota", email+"|"+display)
+}
+
+// MailActivity renders the last ~200 mail.log entries that touched the given
+// mailbox (as sender or recipient). Pure read; no side effects.
+func (h *AdminHandlers) MailActivity(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("email")))
+	if !emailRE.MatchString(email) {
+		http.Error(w, "invalid email", http.StatusBadRequest)
+		return
+	}
+
+	events, err := mailActivityFor(email)
+
+	d.Title = "Mail activity"
+	d.Data = map[string]any{
+		"Email":  email,
+		"Events": events,
+		"Error":  errText(err),
+	}
+	h.renderAdmin(w, r, "admin-mail-activity", *d)
+}
+
+// MailActivityEvent is one reconstructed Postfix mail-flow record. A record
+// can collect multiple log lines that share the same Postfix queue ID — we
+// keep the timestamp from the first line that sets a from/to and the status
+// from the line that announces the final disposition (sent/bounced/deferred).
+type MailActivityEvent struct {
+	Timestamp time.Time
+	QueueID   string
+	From      string
+	To        string
+	SizeBytes int64
+	Status    string // "sent" | "bounced" | "deferred" | ""
+	DSN       string // e.g. "5.2.2"
+	// Direction: "in" if `email` is the recipient, "out" if it's the sender.
+	Direction string
+	// Counterparty is the other side of the flow from `email`'s perspective.
+	Counterparty string
+}
+
+// in-process cache: 5s TTL keyed by email so a refresh doesn't re-parse the
+// log. Map size is bounded — entries are evicted lazily on read when stale.
+var (
+	mailActivityCacheMu sync.Mutex
+	mailActivityCache   = map[string]mailActivityCacheEntry{}
+)
+
+type mailActivityCacheEntry struct {
+	at     time.Time
+	events []MailActivityEvent
+	err    error
+}
+
+// mailActivityFor wraps the file IO + parser + cache. The parser is split out
+// (parseMailLog) so it can be unit-tested with fixture lines.
+func mailActivityFor(email string) ([]MailActivityEvent, error) {
+	mailActivityCacheMu.Lock()
+	if e, ok := mailActivityCache[email]; ok && time.Since(e.at) < mailActivityCacheT {
+		mailActivityCacheMu.Unlock()
+		return e.events, e.err
+	}
+	mailActivityCacheMu.Unlock()
+
+	lines, err := readMailLogTail(mailLogPath, mailLogTailMax)
+	if err != nil {
+		mailActivityCacheMu.Lock()
+		mailActivityCache[email] = mailActivityCacheEntry{at: time.Now(), err: err}
+		mailActivityCacheMu.Unlock()
+		return nil, err
+	}
+	events := parseMailLog(lines, email, mailActivityCap)
+
+	mailActivityCacheMu.Lock()
+	mailActivityCache[email] = mailActivityCacheEntry{at: time.Now(), events: events}
+	mailActivityCacheMu.Unlock()
+	return events, nil
+}
+
+// readMailLogTail reads the file at path, capping memory by seeking to the
+// last `maxBytes` if the file is larger. Returns lines (no trailing newline).
+// If the file is missing the caller gets an empty slice + the error so the
+// page can render a "no log accessible" notice.
+func readMailLogTail(path string, maxBytes int64) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if st.Size() > maxBytes {
+		if _, err := f.Seek(st.Size()-maxBytes, io.SeekStart); err != nil {
+			return nil, err
+		}
+	}
+	br := bufio.NewReader(f)
+	// First (possibly partial) line after a Seek is dropped — we don't know
+	// where the previous newline was. Subsequent lines are clean.
+	dropPartial := st.Size() > maxBytes
+	var lines []string
+	for {
+		line, err := br.ReadString('\n')
+		if line != "" {
+			if dropPartial {
+				dropPartial = false
+			} else {
+				lines = append(lines, strings.TrimRight(line, "\r\n"))
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+	return lines, nil
+}
+
+// Postfix log lines come in two header flavours:
+//   syslog:        "May  9 12:34:56 host postfix/qmgr[123]: ABC123: from=<x>, ..."
+//   rfc3339-ish:   "2026-05-09T12:34:56.789012+00:00 host postfix/smtpd[123]: ABC123: ..."
+// We accept both. The component (`postfix/qmgr`, `postfix/smtpd`, ...) is
+// matched loosely; only `postfix/*` lines are interesting.
+var (
+	mailLogHeadRE = regexp.MustCompile(`^(\S+(?:\s+\S+\s+\S+)?)\s+\S+\s+postfix/[A-Za-z0-9._-]+\[\d+\]:\s+(.*)$`)
+	queueIDRE     = regexp.MustCompile(`^([A-F0-9]{8,})\s*:\s*(.*)$`)
+	fromRE        = regexp.MustCompile(`from=<([^>]*)>`)
+	toRE          = regexp.MustCompile(`to=<([^>]*)>`)
+	sizeRE        = regexp.MustCompile(`size=(\d+)`)
+	statusRE      = regexp.MustCompile(`status=(\w+)`)
+	dsnRE         = regexp.MustCompile(`dsn=(\d+\.\d+\.\d+)`)
+)
+
+// parseMailLog groups Postfix log lines by queue ID, filters down to events
+// where `email` is the sender or any recipient, and returns up to `cap`
+// events sorted descending by timestamp. Pure function — no IO.
+func parseMailLog(lines []string, email string, cap int) []MailActivityEvent {
+	if email == "" {
+		return nil
+	}
+	emailLower := strings.ToLower(email)
+	now := time.Now()
+
+	type acc struct {
+		ts     time.Time
+		from   string
+		to     []string
+		size   int64
+		status string
+		dsn    string
+	}
+	byQID := map[string]*acc{}
+	order := []string{} // first-seen order, used as a stable tiebreaker
+
+	for _, line := range lines {
+		m := mailLogHeadRE.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		ts := parseMailLogTimestamp(m[1], now)
+		body := m[2]
+		qm := queueIDRE.FindStringSubmatch(body)
+		if qm == nil {
+			continue
+		}
+		qid := qm[1]
+		rest := qm[2]
+		a, ok := byQID[qid]
+		if !ok {
+			a = &acc{ts: ts}
+			byQID[qid] = a
+			order = append(order, qid)
+		} else if a.ts.IsZero() && !ts.IsZero() {
+			a.ts = ts
+		}
+		if mm := fromRE.FindStringSubmatch(rest); mm != nil && a.from == "" {
+			a.from = strings.ToLower(mm[1])
+		}
+		if mm := toRE.FindStringSubmatch(rest); mm != nil {
+			to := strings.ToLower(mm[1])
+			if !containsString(a.to, to) {
+				a.to = append(a.to, to)
+			}
+		}
+		if mm := sizeRE.FindStringSubmatch(rest); mm != nil && a.size == 0 {
+			fmt.Sscanf(mm[1], "%d", &a.size)
+		}
+		if mm := statusRE.FindStringSubmatch(rest); mm != nil {
+			a.status = mm[1]
+			a.ts = ts // disposition line wins for the displayed timestamp
+		}
+		if mm := dsnRE.FindStringSubmatch(rest); mm != nil {
+			a.dsn = mm[1]
+		}
+	}
+
+	var out []MailActivityEvent
+	for _, qid := range order {
+		a := byQID[qid]
+		isSender := a.from == emailLower
+		var matchTo string
+		for _, t := range a.to {
+			if t == emailLower {
+				matchTo = t
+				break
+			}
+		}
+		if !isSender && matchTo == "" {
+			continue
+		}
+		ev := MailActivityEvent{
+			Timestamp: a.ts,
+			QueueID:   qid,
+			From:      a.from,
+			SizeBytes: a.size,
+			Status:    a.status,
+			DSN:       a.dsn,
+		}
+		if len(a.to) > 0 {
+			ev.To = a.to[0]
+		}
+		if isSender {
+			ev.Direction = "out"
+			if len(a.to) > 0 {
+				ev.Counterparty = a.to[0]
+			}
+		} else {
+			ev.Direction = "in"
+			ev.Counterparty = a.from
+		}
+		out = append(out, ev)
+	}
+
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Timestamp.After(out[j].Timestamp) })
+	if len(out) > cap {
+		out = out[:cap]
+	}
+	return out
+}
+
+// parseMailLogTimestamp accepts both the syslog-style "May  9 12:34:56" stamp
+// (no year — we infer it from `now`, rolling backward when the parsed month is
+// in the future) and the rfc3339-ish stamp Postfix emits when systemd's
+// journalctl is the log source. Returns zero on any parse failure.
+func parseMailLogTimestamp(s string, now time.Time) time.Time {
+	s = strings.TrimSpace(s)
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return t
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t
+	}
+	// syslog: "May  9 12:34:56" — lacks a year.
+	if t, err := time.Parse("Jan _2 15:04:05", s); err == nil {
+		t = time.Date(now.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, now.Location())
+		if t.After(now.Add(24 * time.Hour)) {
+			t = t.AddDate(-1, 0, 0)
+		}
+		return t
+	}
+	return time.Time{}
+}
+
+func containsString(xs []string, s string) bool {
+	for _, x := range xs {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
+func errText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 // ----------------------------------------------------------------------------

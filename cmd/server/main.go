@@ -196,6 +196,7 @@ func main() {
 		{Name: "admin-mail", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail.html"},
 		{Name: "admin-mail-import", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-import.html"},
 		{Name: "admin-mail-import-result", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-import-result.html"},
+		{Name: "admin-mail-activity", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-activity.html"},
 	}
 	if err := rend.Register(pages); err != nil {
 		log.Fatalf("register pages: %v", err)
@@ -434,6 +435,7 @@ func main() {
 	mux.HandleFunc("POST /admin/mail/quota", adminH.MailQuota)
 	mux.HandleFunc("GET /admin/mail/import", adminH.MailImportPage)
 	mux.HandleFunc("POST /admin/mail/import", adminH.MailImportSubmit)
+	mux.HandleFunc("GET /admin/mail/activity", adminH.MailActivity)
 	mux.HandleFunc("GET /admin/settings", adminH.SettingsPage)
 	mux.HandleFunc("POST /admin/settings", adminH.SettingsSave)
 	mux.HandleFunc("GET /admin/settings/test-connection", adminH.SettingsTestConnection)
