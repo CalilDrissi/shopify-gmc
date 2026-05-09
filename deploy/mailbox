@@ -302,6 +302,583 @@ cmd_unsuspend() {
   echo "ok: $email unsuspended"
 }
 
+# --- Phase 3: vacation auto-responder -------------------------------------
+# --- vacation auto-responder ------------------------------------------------
+
+# vacation_dir <email> — print the maildir root for the user (validated).
+# Errors out if the directory doesn't exist; refuses to create paths
+# outside the vmail tree.
+vacation_dir() {
+  local email="$1"
+  require_email "$email"
+  local local_p; local_p=$(local_part "$email")
+  local domain;  domain=$(domain_of "$email")
+  local dir="$VMAIL_BASE/$domain/$local_p"
+  [ -d "$dir" ] || { echo "no maildir for $email (run: mailbox add $email)" >&2; exit 1; }
+  echo "$dir"
+}
+
+# sieve_escape — backslash-escape `\` and `"` so the value is safe to embed
+# in a Sieve double-quoted string literal. Sieve string literals follow the
+# same escape rules as JSON for these two chars; everything else is literal.
+sieve_escape() {
+  local s="${1-}"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
+}
+
+# generate_vacation_sieve <subject> <body> [start] [end]
+# Emits a self-contained Sieve script using the `vacation` extension.
+# Subject + body are escaped; start/end (if both present) become a
+# `currentdate :value` guard so replies only fire inside the window.
+generate_vacation_sieve() {
+  local subject="$1" body="$2" start="${3:-}" end="${4:-}"
+  local esc_subject esc_body
+  esc_subject=$(sieve_escape "$subject")
+  esc_body=$(sieve_escape "$body")
+
+  if [ -n "$start" ] && [ -n "$end" ]; then
+    cat <<SIEVE
+require ["vacation", "date", "relational"];
+if allof (currentdate :value "ge" "date" "$start",
+          currentdate :value "le" "date" "$end") {
+  vacation
+    :days 1
+    :subject "$esc_subject"
+    "$esc_body";
+}
+SIEVE
+  else
+    cat <<SIEVE
+require ["vacation"];
+vacation
+  :days 1
+  :subject "$esc_subject"
+  "$esc_body";
+SIEVE
+  fi
+}
+
+cmd_vacation() {
+  local email="${1:?email required}"; shift || true
+  local action="${1:-}"; shift || true
+  require_email "$email"
+
+  local dir; dir=$(vacation_dir "$email")
+  local sieve_dir="$dir/sieve"
+  local script="$sieve_dir/vacation.sieve"
+  local active="$dir/.dovecot.sieve"
+
+  case "$action" in
+    enable)
+      [ -f "$script" ] || { echo "no vacation.sieve for $email — run 'mailbox vacation $email set ...' first" >&2; exit 1; }
+      ln -sfn "sieve/vacation.sieve" "$active"
+      chown -h vmail:vmail "$active" 2>/dev/null || true
+      echo "ok: vacation enabled for $email"
+      ;;
+    disable)
+      rm -f "$active"
+      echo "ok: vacation disabled for $email"
+      ;;
+    set)
+      local subject="${1:?subject required}"
+      local body="${2:?body required}"
+      local start="${3:-}" end="${4:-}"
+      if [ -n "$start" ] && ! [[ "$start" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        echo "bad start date: $start (use YYYY-MM-DD)" >&2; exit 1
+      fi
+      if [ -n "$end" ] && ! [[ "$end" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        echo "bad end date: $end (use YYYY-MM-DD)" >&2; exit 1
+      fi
+      install -d -o vmail -g vmail -m 0700 "$sieve_dir"
+      local tmp; tmp=$(mktemp)
+      generate_vacation_sieve "$subject" "$body" "$start" "$end" > "$tmp"
+      install -o vmail -g vmail -m 0600 "$tmp" "$script"
+      rm -f "$tmp"
+      echo "ok: vacation script written for $email"
+      ;;
+    *)
+      echo "usage: mailbox vacation EMAIL {enable|disable|set SUBJECT BODY [START END]}" >&2
+      exit 2
+      ;;
+  esac
+}
+
+cmd_vacation_status() {
+  local email="${1:?email required}"
+  require_email "$email"
+  local local_p; local_p=$(local_part "$email")
+  local domain;  domain=$(domain_of "$email")
+  local active="$VMAIL_BASE/$domain/$local_p/.dovecot.sieve"
+  if [ -L "$active" ] || [ -f "$active" ]; then
+    echo "enabled"
+  else
+    echo "disabled"
+  fi
+}
+
+
+# --- Phase 5: sieve filters (inbox rules) ----------------------------------
+# --- sieve filters (inbox rules) -------------------------------------------
+#
+# Storage layout (per mailbox):
+#   /var/mail/vmail/<domain>/<local>/sieve/filters.sieve   ← the rules file
+#   /var/mail/vmail/<domain>/<local>/.dovecot.sieve        ← active script
+#
+# filters.sieve is a managed TSV-with-comments file: each rule is a `# RULE`
+# comment line carrying the structured TSV (so we can round-trip without
+# parsing Sieve), followed by the equivalent Sieve `if ... { ... }` block.
+# Phase 3's vacation logic, if/when active, writes its own script and we
+# stitch them together via an `include` in `.dovecot.sieve`.
+#
+# Field syntax:
+#   from              → Sieve `address :is "From"`
+#   subject           → Sieve `header :contains "Subject"`
+#   header:X-Name     → Sieve `header :contains "X-Name"`
+# Action syntax:
+#   move FOLDER       → fileinto "FOLDER";  (requires "fileinto")
+#   tag TAG           → addflag  "TAG";     (requires "imap4flags")
+#   forward EMAIL     → redirect "EMAIL";
+#   discard           → discard;
+
+sieve_dir_for() {
+  local email="$1"
+  local local=$(local_part "$email") domain=$(domain_of "$email")
+  echo "$VMAIL_BASE/$domain/$local/sieve"
+}
+
+filters_path_for() { echo "$(sieve_dir_for "$1")/filters.sieve"; }
+active_link_for() {
+  local email="$1"
+  local local=$(local_part "$email") domain=$(domain_of "$email")
+  echo "$VMAIL_BASE/$domain/$local/.dovecot.sieve"
+}
+
+# sieve_escape escapes a string for inclusion inside Sieve "..." literals.
+# Sieve quoted strings escape backslash and double-quote with a backslash.
+sieve_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
+}
+
+# require_field validates the FIELD argument.
+require_field() {
+  case "$1" in
+    from|subject) return 0 ;;
+    header:*)
+      local name="${1#header:}"
+      [[ "$name" =~ ^[A-Za-z0-9-]+$ ]] || { echo "bad header name: $name"; exit 1; }
+      ;;
+    *) echo "bad field: $1 (use from|subject|header:X-NAME)"; exit 1 ;;
+  esac
+}
+
+require_action() {
+  case "$1" in
+    move|tag|forward|discard) return 0 ;;
+    *) echo "bad action: $1 (use move|tag|forward|discard)"; exit 1 ;;
+  esac
+}
+
+# Render a single rule's Sieve block (no `require` — that's emitted once).
+render_rule_block() {
+  local field="$1" value="$2" action="$3" arg="$4"
+  local test
+  case "$field" in
+    from)    test="address :is \"From\" \"$(sieve_escape "$value")\"" ;;
+    subject) test="header :contains \"Subject\" \"$(sieve_escape "$value")\"" ;;
+    header:*) test="header :contains \"$(sieve_escape "${field#header:}")\" \"$(sieve_escape "$value")\"" ;;
+  esac
+  local body
+  case "$action" in
+    move)    body="fileinto \"$(sieve_escape "$arg")\";" ;;
+    tag)     body="addflag \"$(sieve_escape "$arg")\";" ;;
+    forward) body="redirect \"$(sieve_escape "$arg")\";" ;;
+    discard) body="discard;" ;;
+  esac
+  printf 'if %s {\n  %s\n  stop;\n}\n' "$test" "$body"
+}
+
+# Rebuild filters.sieve from the array of `field<TAB>value<TAB>action<TAB>arg`
+# lines passed via stdin (one per line). Order in = order out.
+write_filters_file() {
+  local email="$1"
+  local dir; dir=$(sieve_dir_for "$email")
+  local file; file=$(filters_path_for "$email")
+  install -d -o vmail -g vmail -m 0700 "$dir"
+
+  local tmp; tmp=$(mktemp)
+  {
+    echo "# managed: filters — edited by /usr/local/bin/mailbox; manual edits are kept"
+    echo "# but rules tagged '# RULE\\t...' are owned by the CLI."
+    echo 'require ["fileinto","imap4flags"];'
+    echo
+    while IFS=$'\t' read -r field value action arg; do
+      [ -z "${field:-}" ] && continue
+      printf '# RULE\t%s\t%s\t%s\t%s\n' "$field" "$value" "$action" "$arg"
+      render_rule_block "$field" "$value" "$action" "$arg"
+      echo
+    done
+  } > "$tmp"
+  install -o vmail -g vmail -m 0600 "$tmp" "$file"
+  rm -f "$tmp"
+
+  # Activate filters.sieve unless another script is already linked. If a
+  # script is already linked (e.g. Phase 3 vacation), don't clobber it —
+  # the operator can stitch them together via an `include "filters";`.
+  local link; link=$(active_link_for "$email")
+  if [ ! -e "$link" ]; then
+    ln -sf "sieve/filters.sieve" "$link"
+    chown -h vmail:vmail "$link" 2>/dev/null || true
+  fi
+
+  # Compile so Dovecot picks up changes immediately.
+  sievec "$file" 2>/dev/null || true
+}
+
+# Read existing rules from filters.sieve. Each `# RULE` line carries the
+# canonical TSV; lines without that tag are user-edited Sieve and are
+# preserved (but not surfaced in the list — power users edit raw Sieve).
+read_filters_tsv() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+  awk -F'\t' '/^# RULE\t/ {
+    sub(/^# RULE\t/, "")
+    print
+  }' "$file"
+}
+
+cmd_filter_list() {
+  local email="${1:?email required}"
+  require_email "$email"
+  local file; file=$(filters_path_for "$email")
+  local id=0
+  read_filters_tsv "$file" | while IFS= read -r line; do
+    id=$((id+1))
+    printf '%d\t%s\n' "$id" "$line"
+  done
+}
+
+cmd_filter_add() {
+  local email="${1:?email required}"
+  local field="${2:?field required}"
+  local value="${3:?value required}"
+  local action="${4:?action required}"
+  local arg="${5:-}"
+  require_email "$email"
+  require_field "$field"
+  require_action "$action"
+  if [ "$action" != "discard" ] && [ -z "$arg" ]; then
+    echo "action $action requires an argument"; exit 1
+  fi
+
+  local file; file=$(filters_path_for "$email")
+  local tmp; tmp=$(mktemp)
+  printf '%s\t%s\t%s\t%s\n' "$field" "$value" "$action" "$arg" > "$tmp"
+  if [ -f "$file" ]; then
+    read_filters_tsv "$file" >> "$tmp"
+  fi
+  write_filters_file "$email" < "$tmp"
+  rm -f "$tmp"
+  echo "ok: rule added for $email"
+}
+
+cmd_filter_del() {
+  local email="${1:?email required}"
+  local id="${2:?id required}"
+  require_email "$email"
+  [[ "$id" =~ ^[0-9]+$ ]] || { echo "bad id: $id"; exit 1; }
+
+  local file; file=$(filters_path_for "$email")
+  [ -f "$file" ] || { echo "no filters file for $email"; exit 1; }
+
+  local tmp; tmp=$(mktemp)
+  awk -F'\t' -v drop="$id" 'BEGIN{n=0} /^# RULE\t/ {
+    n++
+    if (n != drop) {
+      sub(/^# RULE\t/, "")
+      print
+    }
+    next
+  }' "$file" > "$tmp"
+  write_filters_file "$email" < "$tmp"
+  rm -f "$tmp"
+  echo "ok: rule $id deleted for $email"
+}
+
+
+# --- Phase 6: spam settings ------------------------------------------------
+# --- spam settings ---------------------------------------------------------
+#
+# State is stored as a single managed Sieve script per mailbox at
+#   $VMAIL_BASE/<domain>/<local>/sieve/spam.sieve
+# Header sentinels embed the lists + threshold so we can round-trip:
+#   # managed: spam
+#   # whitelist: a@b.com,c@d.com
+#   # blacklist: x@y.com
+#   # threshold: 8.0      (or absent if unset)
+# The active script at .dovecot.sieve `include`s "spam" (and, if a Phase 5
+# "filters" file exists, "filters" too — both files coexist).
+
+spam_dir_for() {
+  local email="$1"
+  local local_p; local_p=$(local_part "$email")
+  local domain; domain=$(domain_of "$email")
+  echo "$VMAIL_BASE/$domain/$local_p/sieve"
+}
+spam_file_for() { echo "$(spam_dir_for "$1")/spam.sieve"; }
+active_sieve_for() {
+  local email="$1"
+  local local_p; local_p=$(local_part "$email")
+  local domain; domain=$(domain_of "$email")
+  echo "$VMAIL_BASE/$domain/$local_p/.dovecot.sieve"
+}
+
+# sieve_quote ESCAPED — emit a string safe to drop inside Sieve double-quotes.
+# Sieve string syntax allows backslash-escapes for `\\` and `\"`; everything
+# else is literal. Reject any control char to keep the file ASCII-clean.
+sieve_quote() {
+  local s="$1"
+  if [[ "$s" =~ [[:cntrl:]] ]]; then
+    echo "bad input (control char): $s" >&2; exit 1
+  fi
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
+}
+
+# parse_spam_state EMAIL — sets globals SPAM_WL, SPAM_BL, SPAM_TH from the
+# sentinels in the existing spam.sieve (or empty defaults).
+parse_spam_state() {
+  local f; f=$(spam_file_for "$1")
+  SPAM_WL=""
+  SPAM_BL=""
+  SPAM_TH=""
+  [ -f "$f" ] || return 0
+  SPAM_WL=$(awk -F': ' '/^# whitelist:/ {sub(/^# whitelist: */,""); print; exit}' "$f" 2>/dev/null || true)
+  SPAM_BL=$(awk -F': ' '/^# blacklist:/ {sub(/^# blacklist: */,""); print; exit}' "$f" 2>/dev/null || true)
+  SPAM_TH=$(awk -F': ' '/^# threshold:/ {sub(/^# threshold: */,""); print; exit}' "$f" 2>/dev/null || true)
+}
+
+# write_spam_sieve EMAIL WHITELIST_CSV BLACKLIST_CSV THRESHOLD
+write_spam_sieve() {
+  local email="$1" wl="${2:-}" bl="${3:-}" th="${4:-}"
+  require_email "$email"
+  grep -q "^$email:" "$USERS" || { echo "no such mailbox: $email"; exit 1; }
+  local local_p; local_p=$(local_part "$email")
+  local domain; domain=$(domain_of "$email")
+  local dir; dir=$(spam_dir_for "$email")
+  local file; file=$(spam_file_for "$email")
+  install -d -o vmail -g vmail -m 0700 "$dir"
+
+  local require="\"fileinto\""
+  local need_envelope=0
+  local rules=""
+
+  if [ -n "$wl" ] || [ -n "$bl" ]; then
+    need_envelope=1
+  fi
+
+  # Whitelist: short-circuit to INBOX (skips later blacklist + threshold).
+  if [ -n "$wl" ]; then
+    local addrs=""
+    local IFS=','
+    for a in $wl; do
+      a="${a## }"; a="${a%% }"
+      [ -z "$a" ] && continue
+      [ -n "$addrs" ] && addrs="$addrs, "
+      addrs="$addrs\"$(sieve_quote "$a")\""
+    done
+    unset IFS
+    if [ -n "$addrs" ]; then
+      rules+=$'if envelope :is "from" ['"$addrs"$']{\n  fileinto "INBOX";\n  stop;\n}\n'
+    fi
+  fi
+
+  # Blacklist: divert to Junk.
+  if [ -n "$bl" ]; then
+    local addrs=""
+    local IFS=','
+    for a in $bl; do
+      a="${a## }"; a="${a%% }"
+      [ -z "$a" ] && continue
+      [ -n "$addrs" ] && addrs="$addrs, "
+      addrs="$addrs\"$(sieve_quote "$a")\""
+    done
+    unset IFS
+    if [ -n "$addrs" ]; then
+      rules+=$'if envelope :is "from" ['"$addrs"$']{\n  fileinto "Junk";\n  stop;\n}\n'
+    fi
+  fi
+
+  # Threshold: requires the relational + comparator-i;ascii-numeric extensions,
+  # plus a header check on X-Spam-Score (rspamd writes this when active).
+  local extras=""
+  if [ -n "$th" ] && [ "$th" != "none" ]; then
+    if ! [[ "$th" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+      echo "bad threshold: $th (use a non-negative number, or 'none')"; exit 1
+    fi
+    extras='"comparator-i;ascii-numeric", "relational"'
+    rules+=$'if header :value "ge" :comparator "i;ascii-numeric" "X-Spam-Score" "'"$th"$'"{\n  fileinto "Junk";\n  stop;\n}\n'
+  fi
+
+  local req_list="$require"
+  [ "$need_envelope" -eq 1 ] && req_list="$req_list, \"envelope\""
+  [ -n "$extras" ] && req_list="$req_list, $extras"
+
+  {
+    echo "# managed: spam"
+    echo "# whitelist: $wl"
+    echo "# blacklist: $bl"
+    if [ -n "$th" ] && [ "$th" != "none" ]; then
+      echo "# threshold: $th"
+    fi
+    echo "require [$req_list];"
+    echo ""
+    printf '%s' "$rules"
+  } > "$file"
+  chown vmail:vmail "$file"
+  chmod 0600 "$file"
+
+  ensure_active_sieve_includes "$email"
+
+  # Recompile so Dovecot's LDA picks up the new script next delivery.
+  sievec "$file" >/dev/null 2>&1 || true
+}
+
+# ensure_active_sieve_includes EMAIL — make $email's .dovecot.sieve `include`
+# both filters (Phase 5) and spam (Phase 6) if those managed files exist.
+# Idempotent.
+ensure_active_sieve_includes() {
+  local email="$1"
+  local active; active=$(active_sieve_for "$email")
+  local dir_owner; dir_owner=$(dirname "$active")
+  local sdir; sdir=$(spam_dir_for "$email")
+  local has_filters=0 has_spam=0
+  [ -f "$sdir/filters.sieve" ] && has_filters=1
+  [ -f "$sdir/spam.sieve" ] && has_spam=1
+
+  # If both are absent, leave any existing user-edited script alone.
+  if [ "$has_filters" -eq 0 ] && [ "$has_spam" -eq 0 ]; then
+    return 0
+  fi
+
+  {
+    echo "# managed: include"
+    echo "require [\"include\"];"
+    [ "$has_filters" -eq 1 ] && echo 'include :personal "filters";'
+    [ "$has_spam" -eq 1 ]    && echo 'include :personal "spam";'
+  } > "$active"
+  chown vmail:vmail "$active" 2>/dev/null || true
+  chmod 0600 "$active" 2>/dev/null || true
+  sievec "$active" >/dev/null 2>&1 || true
+}
+
+# csv_remove CSV ITEM — print CSV with ITEM removed (case-insensitive match).
+csv_remove() {
+  local csv="$1" item="$2"
+  local out=""
+  local IFS=','
+  for a in $csv; do
+    a="${a## }"; a="${a%% }"
+    [ -z "$a" ] && continue
+    if [ "${a,,}" = "${item,,}" ]; then continue; fi
+    [ -n "$out" ] && out="$out,"
+    out="$out$a"
+  done
+  unset IFS
+  printf '%s' "$out"
+}
+
+# csv_add CSV ITEM — append ITEM to CSV unless already present (case-insensitive).
+csv_add() {
+  local csv="$1" item="$2"
+  local IFS=','
+  for a in $csv; do
+    a="${a## }"; a="${a%% }"
+    if [ "${a,,}" = "${item,,}" ]; then
+      unset IFS
+      printf '%s' "$csv"
+      return
+    fi
+  done
+  unset IFS
+  if [ -z "$csv" ]; then
+    printf '%s' "$item"
+  else
+    printf '%s,%s' "$csv" "$item"
+  fi
+}
+
+cmd_spam_list() {
+  local email="${1:?email required}"
+  require_email "$email"
+  parse_spam_state "$email"
+  echo "whitelist:${SPAM_WL}"
+  echo "blacklist:${SPAM_BL}"
+  if [ -z "$SPAM_TH" ]; then
+    echo "threshold:none"
+  else
+    echo "threshold:${SPAM_TH}"
+  fi
+}
+
+cmd_spam_allow() {
+  local email="${1:?email required}" addr="${2:?addr required}"
+  require_email "$email"
+  parse_spam_state "$email"
+  SPAM_WL=$(csv_add "$SPAM_WL" "$addr")
+  write_spam_sieve "$email" "$SPAM_WL" "$SPAM_BL" "$SPAM_TH"
+  echo "ok: whitelisted $addr for $email"
+}
+
+cmd_spam_block() {
+  local email="${1:?email required}" addr="${2:?addr required}"
+  require_email "$email"
+  parse_spam_state "$email"
+  SPAM_BL=$(csv_add "$SPAM_BL" "$addr")
+  write_spam_sieve "$email" "$SPAM_WL" "$SPAM_BL" "$SPAM_TH"
+  echo "ok: blacklisted $addr for $email"
+}
+
+cmd_spam_unallow() {
+  local email="${1:?email required}" addr="${2:?addr required}"
+  require_email "$email"
+  parse_spam_state "$email"
+  SPAM_WL=$(csv_remove "$SPAM_WL" "$addr")
+  write_spam_sieve "$email" "$SPAM_WL" "$SPAM_BL" "$SPAM_TH"
+  echo "ok: removed $addr from whitelist for $email"
+}
+
+cmd_spam_unblock() {
+  local email="${1:?email required}" addr="${2:?addr required}"
+  require_email "$email"
+  parse_spam_state "$email"
+  SPAM_BL=$(csv_remove "$SPAM_BL" "$addr")
+  write_spam_sieve "$email" "$SPAM_WL" "$SPAM_BL" "$SPAM_TH"
+  echo "ok: removed $addr from blacklist for $email"
+}
+
+cmd_spam_threshold() {
+  local email="${1:?email required}" score="${2:-}"
+  require_email "$email"
+  parse_spam_state "$email"
+  if [ -z "$score" ] || [ "$score" = "none" ]; then
+    SPAM_TH=""
+  else
+    if ! [[ "$score" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+      echo "bad threshold: $score (use a non-negative number, or 'none')"; exit 1
+    fi
+    SPAM_TH="$score"
+  fi
+  write_spam_sieve "$email" "$SPAM_WL" "$SPAM_BL" "$SPAM_TH"
+  echo "ok: threshold for $email = ${SPAM_TH:-none}"
+}
+
+
 usage() {
   sed -n '/^# mailbox/,/^set -e/p' "$0" | sed 's/^# *//; /^$/q'
   exit 2
@@ -323,6 +900,17 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     recalc)  shift; cmd_recalc "$@" ;;
     suspend) shift; cmd_suspend "$@" ;;
     unsuspend) shift; cmd_unsuspend "$@" ;;
+    vacation) shift; cmd_vacation "$@" ;;
+    vacation-status) shift; cmd_vacation_status "$@" ;;
+    filter-list) shift; cmd_filter_list "$@" ;;
+    filter-add)  shift; cmd_filter_add "$@" ;;
+    filter-del)  shift; cmd_filter_del "$@" ;;
+    spam-list)      shift; cmd_spam_list "$@" ;;
+    spam-allow)     shift; cmd_spam_allow "$@" ;;
+    spam-block)     shift; cmd_spam_block "$@" ;;
+    spam-unallow)   shift; cmd_spam_unallow "$@" ;;
+    spam-unblock)   shift; cmd_spam_unblock "$@" ;;
+    spam-threshold) shift; cmd_spam_threshold "$@" ;;
     *)       usage ;;
   esac
 fi

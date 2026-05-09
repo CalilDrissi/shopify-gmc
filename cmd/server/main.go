@@ -197,6 +197,9 @@ func main() {
 		{Name: "admin-mail-import", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-import.html"},
 		{Name: "admin-mail-import-result", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-import-result.html"},
 		{Name: "admin-mail-activity", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-activity.html"},
+		{Name: "admin-mail-vacation", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-vacation.html"},
+		{Name: "admin-mail-filters", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-filters.html"},
+		{Name: "admin-mail-spam", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-spam.html"},
 	}
 	if err := rend.Register(pages); err != nil {
 		log.Fatalf("register pages: %v", err)
@@ -437,6 +440,15 @@ func main() {
 	mux.HandleFunc("POST /admin/mail/import", adminH.MailImportSubmit)
 	mux.HandleFunc("GET /admin/mail/activity", adminH.MailActivity)
 	mux.HandleFunc("POST /admin/mail/suspend", adminH.MailSuspend)
+	mux.HandleFunc("GET /admin/mail/vacation", adminH.MailVacationGet)
+	mux.HandleFunc("POST /admin/mail/vacation", adminH.MailVacationSave)
+	mux.HandleFunc("GET /admin/mail/filters", adminH.MailFilters)
+	mux.HandleFunc("POST /admin/mail/filters/add", adminH.MailFilterAdd)
+	mux.HandleFunc("POST /admin/mail/filters/del", adminH.MailFilterDel)
+	mux.HandleFunc("GET /admin/mail/spam", adminH.MailSpamGet)
+	mux.HandleFunc("POST /admin/mail/spam/add", adminH.MailSpamAdd)
+	mux.HandleFunc("POST /admin/mail/spam/del", adminH.MailSpamDel)
+	mux.HandleFunc("POST /admin/mail/spam/threshold", adminH.MailSpamThreshold)
 	mux.HandleFunc("GET /admin/settings", adminH.SettingsPage)
 	mux.HandleFunc("POST /admin/settings", adminH.SettingsSave)
 	mux.HandleFunc("GET /admin/settings/test-connection", adminH.SettingsTestConnection)

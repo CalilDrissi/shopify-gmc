@@ -46,6 +46,15 @@ var (
 	quotaRuleRE = regexp.MustCompile(`userdb_quota_rule=\*:storage=([0-9]+[KMGTkmgt]?)`)
 	// nopassword=y in the 8th-field extras → mailbox is suspended (auth rejected).
 	suspendedRE = regexp.MustCompile(`(^|[\s:])nopassword=y(\s|$)`)
+	// vacation* pull values back out of a sieve script we generated.
+	vacationSubjectRE = regexp.MustCompile(`(?s):subject\s+"((?:\\.|[^"\\])*)"`)
+	vacationBodyRE    = regexp.MustCompile(`(?s)"((?:\\.|[^"\\])*)"\s*;\s*\}?\s*$`)
+	vacationStartRE   = regexp.MustCompile(`currentdate\s+:value\s+"ge"\s+"date"\s+"(\d{4}-\d{2}-\d{2})"`)
+	vacationEndRE     = regexp.MustCompile(`currentdate\s+:value\s+"le"\s+"date"\s+"(\d{4}-\d{2}-\d{2})"`)
+	isoDateRE         = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	// thresholdRE allows a non-negative decimal (e.g. "8", "5.5") or empty/"none"
+	// to clear. Anything else is rejected by MailSpamThreshold before shelling out.
+	thresholdRE = regexp.MustCompile(`^([0-9]+(\.[0-9]+)?)?$`)
 )
 
 // MailPage lists every mailbox + alias on the host. Admin-only.
@@ -310,6 +319,96 @@ func (h *AdminHandlers) MailSuspend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	mailRedirect(w, r, action, email)
+}
+
+// MailVacationGet renders the per-mailbox vacation editor.
+func (h *AdminHandlers) MailVacationGet(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("email")))
+	if !emailRE.MatchString(email) {
+		http.Error(w, "invalid email", http.StatusBadRequest)
+		return
+	}
+	state := readVacationState(email)
+	d.Title = "Vacation · " + email
+	d.Data = map[string]any{
+		"Configured": mailboxConfigured(),
+		"Email":      email,
+		"State":      state,
+	}
+	h.renderAdmin(w, r, "admin-mail-vacation", *d)
+}
+
+// MailVacationSave writes a new vacation.sieve, then enables or disables it.
+func (h *AdminHandlers) MailVacationSave(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	if !mailboxConfigured() {
+		http.Error(w, "mail not configured on this host", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	subject := strings.TrimSpace(r.FormValue("subject"))
+	body := r.FormValue("body")
+	start := strings.TrimSpace(r.FormValue("start"))
+	end := strings.TrimSpace(r.FormValue("end"))
+	enable := r.FormValue("enabled") != ""
+
+	if !emailRE.MatchString(email) {
+		mailRedirect(w, r, "error", "invalid email")
+		return
+	}
+	if subject == "" {
+		mailRedirect(w, r, "error", "subject required")
+		return
+	}
+	if strings.TrimSpace(body) == "" {
+		mailRedirect(w, r, "error", "body required")
+		return
+	}
+	if start != "" && !isoDateRE.MatchString(start) {
+		mailRedirect(w, r, "error", "start must be YYYY-MM-DD")
+		return
+	}
+	if end != "" && !isoDateRE.MatchString(end) {
+		mailRedirect(w, r, "error", "end must be YYYY-MM-DD")
+		return
+	}
+	if (start == "") != (end == "") {
+		mailRedirect(w, r, "error", "start and end must be set together (or both empty)")
+		return
+	}
+
+	args := []string{mailboxBinary, "vacation", email, "set", subject, body}
+	if start != "" {
+		args = append(args, start, end)
+	}
+	if out, err := runSudo(args...); err != nil {
+		mailRedirect(w, r, "error", trimOut(err.Error()+"\n"+out))
+		return
+	}
+	verb := "disable"
+	kind := "vacation-off"
+	if enable {
+		verb = "enable"
+		kind = "vacation-on"
+	}
+	if out, err := runSudo(mailboxBinary, "vacation", email, verb); err != nil {
+		mailRedirect(w, r, "error", trimOut(err.Error()+"\n"+out))
+		return
+	}
+	mailRedirect(w, r, kind, email)
 }
 
 // MailActivity renders the last ~200 mail.log entries that touched the given
@@ -626,6 +725,17 @@ type Mailbox struct {
 	UsedBytes  int64
 	QuotaBytes int64 // 0 means unlimited
 	Suspended  bool
+	Vacation   MailVacationState
+}
+
+// MailVacationState mirrors the parsed contents of vacation.sieve plus a
+// flag for whether the active-script symlink currently points at it.
+type MailVacationState struct {
+	Enabled bool
+	Subject string
+	Body    string
+	Start   string
+	End     string
 }
 
 // readMailboxes parses /etc/dovecot/users (one mailbox per line, fields
@@ -661,6 +771,7 @@ func readMailboxes() ([]Mailbox, error) {
 			UsedBytes:  used,
 			QuotaBytes: quotaBytes,
 			Suspended:  suspendedRE.MatchString(line),
+			Vacation:   readVacationState(email),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Email < out[j].Email })
@@ -754,6 +865,84 @@ func maildirsizeUsedBytes(path string) int64 {
 		return 0
 	}
 	return total
+}
+
+// vacationSievePath / vacationActivePath map an email to the on-disk
+// paths the mailbox CLI writes. We read these directly (cheap stat +
+// open) rather than shelling out for status — same pattern as the
+// quota reader.
+func vacationSievePath(email string) string {
+	at := strings.LastIndex(email, "@")
+	if at <= 0 || at == len(email)-1 {
+		return ""
+	}
+	return vmailBase + "/" + email[at+1:] + "/" + email[:at] + "/sieve/vacation.sieve"
+}
+
+func vacationActivePath(email string) string {
+	at := strings.LastIndex(email, "@")
+	if at <= 0 || at == len(email)-1 {
+		return ""
+	}
+	return vmailBase + "/" + email[at+1:] + "/" + email[:at] + "/.dovecot.sieve"
+}
+
+// readVacationState parses sieve/vacation.sieve (if it exists) and
+// reports whether .dovecot.sieve is the active symlink. Missing files
+// produce a zero state — caller treats that as "no vacation configured".
+func readVacationState(email string) MailVacationState {
+	out := MailVacationState{}
+	scriptPath := vacationSievePath(email)
+	activePath := vacationActivePath(email)
+	if scriptPath == "" {
+		return out
+	}
+	if _, err := os.Lstat(activePath); err == nil {
+		out.Enabled = true
+	}
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return out
+	}
+	out.Subject, out.Body, out.Start, out.End = parseVacationSieve(string(data))
+	return out
+}
+
+// parseVacationSieve extracts subject / body / start / end from a sieve
+// script we generated. Body is the last quoted string before the trailing
+// `;` of the vacation action (which our generator always places at end of
+// the file, optionally inside a date-guard `if {...}` block).
+func parseVacationSieve(s string) (subject, body, start, end string) {
+	if m := vacationSubjectRE.FindStringSubmatch(s); len(m) == 2 {
+		subject = unescapeSieveString(m[1])
+	}
+	if m := vacationBodyRE.FindStringSubmatch(strings.TrimRight(s, " \t\r\n")); len(m) == 2 {
+		body = unescapeSieveString(m[1])
+	}
+	if m := vacationStartRE.FindStringSubmatch(s); len(m) == 2 {
+		start = m[1]
+	}
+	if m := vacationEndRE.FindStringSubmatch(s); len(m) == 2 {
+		end = m[1]
+	}
+	return
+}
+
+// unescapeSieveString reverses the `\\` and `\"` escapes the CLI applies.
+// Anything else is treated as literal — Sieve does not have C-style
+// numeric escapes.
+func unescapeSieveString(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' && i+1 < len(s) {
+			b.WriteByte(s[i+1])
+			i++
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
 }
 
 // MailAlias is a from→to pair.
@@ -1041,3 +1230,436 @@ func (h *AdminHandlers) MailImportSubmit(w http.ResponseWriter, r *http.Request)
 	}
 	h.renderAdmin(w, r, "admin-mail-import-result", *d)
 }
+
+// ============================================================================
+// Phase 5 — Sieve filter rules
+// ============================================================================
+
+// FilterRule mirrors one row from `mailbox filter-list`. ID is 1-based and
+// the index sent back to `mailbox filter-del`.
+type FilterRule struct {
+	ID     int
+	Field  string
+	Value  string
+	Action string
+	Arg    string
+}
+
+var (
+	// fieldRE: from | subject | header:X-NAME (header name is RFC-ish ASCII).
+	filterFieldRE = regexp.MustCompile(`^(from|subject|header:[A-Za-z0-9-]+)$`)
+	// actionRE: one of the four actions our CLI knows how to render.
+	filterActionRE = regexp.MustCompile(`^(move|tag|forward|discard)$`)
+)
+
+// MailFilters renders the per-mailbox filter rules page. Lists current
+// rules (parsed from `mailbox filter-list EMAIL`'s TSV) and renders the
+// add-rule form.
+func (h *AdminHandlers) MailFilters(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("email")))
+	if !emailRE.MatchString(email) {
+		http.Error(w, "invalid email", http.StatusBadRequest)
+		return
+	}
+
+	configured := mailboxConfigured()
+	var rules []FilterRule
+	var listErr string
+	if configured {
+		out, err := runSudo(mailboxBinary, "filter-list", email)
+		if err != nil {
+			listErr = trimOut(err.Error() + "\n" + out)
+		} else {
+			rules = parseFilterListTSV(out)
+		}
+	}
+
+	d.Title = "Mail filters"
+	d.Data = map[string]any{
+		"Configured": configured,
+		"Email":      email,
+		"Rules":      rules,
+		"Result":     mailResultFromQuery(r),
+		"Error":      listErr,
+	}
+	h.renderAdmin(w, r, "admin-mail-filters", *d)
+}
+
+// MailFilterAdd prepends a rule to the mailbox's filters file.
+func (h *AdminHandlers) MailFilterAdd(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	if !mailboxConfigured() {
+		http.Error(w, "mail not configured on this host", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	field := strings.TrimSpace(r.FormValue("field"))
+	value := strings.TrimSpace(r.FormValue("value"))
+	action := strings.TrimSpace(r.FormValue("action"))
+	arg := strings.TrimSpace(r.FormValue("arg"))
+	if !emailRE.MatchString(email) {
+		filterRedirect(w, r, email, "error", "invalid email")
+		return
+	}
+	if !filterFieldRE.MatchString(field) {
+		filterRedirect(w, r, email, "error", "field must be from, subject, or header:X-NAME")
+		return
+	}
+	if !filterActionRE.MatchString(action) {
+		filterRedirect(w, r, email, "error", "action must be move, tag, forward, or discard")
+		return
+	}
+	if value == "" {
+		filterRedirect(w, r, email, "error", "value is required")
+		return
+	}
+	if action != "discard" && arg == "" {
+		filterRedirect(w, r, email, "error", "argument is required for "+action)
+		return
+	}
+	if action == "forward" && !emailRE.MatchString(arg) {
+		filterRedirect(w, r, email, "error", "forward target must be a valid email")
+		return
+	}
+	if _, err := runSudo(mailboxBinary, "filter-add", email, field, value, action, arg); err != nil {
+		filterRedirect(w, r, email, "error", trimOut(err.Error()))
+		return
+	}
+	filterRedirect(w, r, email, "filter-add", action)
+}
+
+// MailFilterDel removes a rule by 1-based index.
+func (h *AdminHandlers) MailFilterDel(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	if !mailboxConfigured() {
+		http.Error(w, "mail not configured on this host", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	id := strings.TrimSpace(r.FormValue("id"))
+	if !emailRE.MatchString(email) {
+		filterRedirect(w, r, email, "error", "invalid email")
+		return
+	}
+	if matched, _ := regexp.MatchString(`^[0-9]+$`, id); !matched {
+		filterRedirect(w, r, email, "error", "bad id")
+		return
+	}
+	if _, err := runSudo(mailboxBinary, "filter-del", email, id); err != nil {
+		filterRedirect(w, r, email, "error", trimOut(err.Error()))
+		return
+	}
+	filterRedirect(w, r, email, "filter-del", id)
+}
+
+// parseFilterListTSV parses the TSV from `mailbox filter-list` —
+// `id<TAB>field<TAB>value<TAB>action<TAB>arg` per line. Rows with too few
+// fields are silently dropped to keep the page renderable even if the CLI
+// version drifts.
+func parseFilterListTSV(out string) []FilterRule {
+	var rules []FilterRule
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) < 4 {
+			continue
+		}
+		var id int
+		fmt.Sscanf(parts[0], "%d", &id)
+		arg := ""
+		if len(parts) >= 5 {
+			arg = parts[4]
+		}
+		rules = append(rules, FilterRule{
+			ID:     id,
+			Field:  parts[1],
+			Value:  parts[2],
+			Action: parts[3],
+			Arg:    arg,
+		})
+	}
+	return rules
+}
+
+// filterRedirect mirrors mailRedirect but stays on the per-mailbox filters
+// page rather than the global mail page.
+func filterRedirect(w http.ResponseWriter, r *http.Request, email, kind, payload string) {
+	q := fmt.Sprintf("?email=%s&result=%s&payload=%s", urlEscape(email), kind, urlEscape(payload))
+	http.Redirect(w, r, "/admin/mail/filters"+q, http.StatusFound)
+}
+
+// ----------------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------------
+
+// mailboxConfigured returns true if the mailbox CLI is installed and
+// executable. Lets the page render gracefully on dev hosts.
+
+// ============================================================================
+// Phase 6 — Spam settings (whitelist/blacklist + threshold)
+// ============================================================================
+
+// SpamState mirrors the three lines printed by `mailbox spam-list`.
+// Threshold is empty when unset (we render "none").
+type SpamState struct {
+	Whitelist []string
+	Blacklist []string
+	Threshold string
+}
+
+// MailSpamGet renders the per-mailbox spam settings page. Empties the form
+// gracefully if rspamd isn't running or if `mailbox spam-list` has nothing
+// to show yet. Threshold input is rendered disabled (with a banner) when
+// rspamd is absent — the whitelist/blacklist still work standalone.
+func (h *AdminHandlers) MailSpamGet(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("email")))
+	if !emailRE.MatchString(email) {
+		http.Error(w, "invalid email", http.StatusBadRequest)
+		return
+	}
+	state := readSpamState(email)
+	rspamd := rspamdRunning()
+
+	d.Title = "Mail · Spam"
+	d.Data = map[string]any{
+		"Configured": mailboxConfigured(),
+		"Email":      email,
+		"State":      state,
+		"Rspamd":     rspamd,
+		"Result":     mailResultFromQuery(r),
+	}
+	h.renderAdmin(w, r, "admin-mail-spam", *d)
+}
+
+// MailSpamAdd appends an address to the mailbox's whitelist or blacklist.
+func (h *AdminHandlers) MailSpamAdd(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	if !mailboxConfigured() {
+		http.Error(w, "mail not configured on this host", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	list := strings.TrimSpace(r.FormValue("list"))
+	addr := strings.TrimSpace(strings.ToLower(r.FormValue("addr")))
+	if !emailRE.MatchString(email) {
+		spamRedirect(w, r, email, "error", "invalid mailbox email")
+		return
+	}
+	if list != "whitelist" && list != "blacklist" {
+		spamRedirect(w, r, email, "error", "list must be whitelist or blacklist")
+		return
+	}
+	if addr == "" || strings.ContainsAny(addr, " \t\r\n,\"\\") {
+		spamRedirect(w, r, email, "error", "invalid sender address")
+		return
+	}
+	sub := "spam-allow"
+	if list == "blacklist" {
+		sub = "spam-block"
+	}
+	if _, err := runSudo(mailboxBinary, sub, email, addr); err != nil {
+		spamRedirect(w, r, email, "error", trimOut(err.Error()))
+		return
+	}
+	spamRedirect(w, r, email, "spam-add", list+"|"+addr)
+}
+
+// MailSpamDel removes an address from a list. Same validation as Add.
+func (h *AdminHandlers) MailSpamDel(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	if !mailboxConfigured() {
+		http.Error(w, "mail not configured on this host", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	list := strings.TrimSpace(r.FormValue("list"))
+	addr := strings.TrimSpace(strings.ToLower(r.FormValue("addr")))
+	if !emailRE.MatchString(email) {
+		spamRedirect(w, r, email, "error", "invalid mailbox email")
+		return
+	}
+	if list != "whitelist" && list != "blacklist" {
+		spamRedirect(w, r, email, "error", "list must be whitelist or blacklist")
+		return
+	}
+	if addr == "" || strings.ContainsAny(addr, " \t\r\n,\"\\") {
+		spamRedirect(w, r, email, "error", "invalid sender address")
+		return
+	}
+	sub := "spam-unallow"
+	if list == "blacklist" {
+		sub = "spam-unblock"
+	}
+	if _, err := runSudo(mailboxBinary, sub, email, addr); err != nil {
+		spamRedirect(w, r, email, "error", trimOut(err.Error()))
+		return
+	}
+	spamRedirect(w, r, email, "spam-del", list+"|"+addr)
+}
+
+// MailSpamThreshold sets or clears the per-mailbox X-Spam-Score threshold.
+// Allowed: empty / "none" / decimal like "8.0". Anything else is rejected.
+func (h *AdminHandlers) MailSpamThreshold(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	if !mailboxConfigured() {
+		http.Error(w, "mail not configured on this host", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	score := strings.TrimSpace(r.FormValue("score"))
+	if !emailRE.MatchString(email) {
+		spamRedirect(w, r, email, "error", "invalid mailbox email")
+		return
+	}
+	if score != "none" && !thresholdRE.MatchString(score) {
+		spamRedirect(w, r, email, "error", "bad threshold (use a number like 8.0, or none)")
+		return
+	}
+	args := []string{mailboxBinary, "spam-threshold", email}
+	if score == "" {
+		args = append(args, "none")
+	} else {
+		args = append(args, score)
+	}
+	if _, err := runSudo(args...); err != nil {
+		spamRedirect(w, r, email, "error", trimOut(err.Error()))
+		return
+	}
+	display := score
+	if display == "" || display == "none" {
+		display = "none"
+	}
+	kind := "spam-threshold"
+	if !rspamdRunning() {
+		kind = "spam-threshold-norspamd"
+	}
+	spamRedirect(w, r, email, kind, display)
+}
+
+// readSpamState invokes `mailbox spam-list EMAIL` (read-only — no sudo
+// needed since the script only opens files vmail can already read; we still
+// route through sudo for symmetry with the writers and to keep one path).
+// On any error we return an empty state — page still renders.
+func readSpamState(email string) SpamState {
+	if !mailboxConfigured() || !emailRE.MatchString(email) {
+		return SpamState{}
+	}
+	out, err := runSudo(mailboxBinary, "spam-list", email)
+	if err != nil {
+		return SpamState{}
+	}
+	return parseSpamList(out)
+}
+
+func parseSpamList(out string) SpamState {
+	var s SpamState
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "whitelist:"):
+			s.Whitelist = splitCSV(strings.TrimPrefix(line, "whitelist:"))
+		case strings.HasPrefix(line, "blacklist:"):
+			s.Blacklist = splitCSV(strings.TrimPrefix(line, "blacklist:"))
+		case strings.HasPrefix(line, "threshold:"):
+			v := strings.TrimSpace(strings.TrimPrefix(line, "threshold:"))
+			if v != "" && v != "none" {
+				s.Threshold = v
+			}
+		}
+	}
+	return s
+}
+
+func splitCSV(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// rspamdRunning reports whether rspamd appears to be active on this host.
+// Used for the "threshold won't fire" banner. Best-effort only — we tolerate
+// a missing systemctl, missing socket, anything non-fatal.
+func rspamdRunning() bool {
+	cmd := exec.Command("systemctl", "is-active", "--quiet", "rspamd")
+	if err := cmd.Run(); err == nil {
+		return true
+	}
+	// Pidfile fallback (some installs don't ship a unit file).
+	for _, p := range []string{"/run/rspamd/rspamd.pid", "/var/run/rspamd/rspamd.pid"} {
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			return true
+		}
+	}
+	return false
+}
+
+func spamRedirect(w http.ResponseWriter, r *http.Request, email, kind, payload string) {
+	q := fmt.Sprintf("?email=%s&result=%s&payload=%s", urlEscape(email), kind, urlEscape(payload))
+	http.Redirect(w, r, "/admin/mail/spam"+q, http.StatusFound)
+}
+
+// ----------------------------------------------------------------------------
+// Helpers

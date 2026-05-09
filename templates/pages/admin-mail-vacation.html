@@ -1,0 +1,55 @@
+{{ define "content" }}
+{{ with .Data }}
+<header style="display:flex; align-items:baseline; justify-content:space-between; gap:16px;">
+  <h1 class="page-title" style="margin:0;">Vacation auto-reply</h1>
+  <a href="/admin/mail" class="c-button c-button--text"><span class="c-button__label">← Back to mailboxes</span></a>
+</header>
+
+<p style="color:var(--md-sys-color-on-surface-variant); margin:8px 0 24px;">
+  Configure an out-of-office auto-reply for <code>{{ .Email }}</code>. Senders receive
+  one reply per day with the subject and body below; the message stays active until
+  you uncheck "Enable auto-reply" or pass the end date.
+</p>
+
+<article class="c-card c-card--outlined" style="max-width:680px;">
+  <div class="c-card__body">
+    <form method="post" action="/admin/mail/vacation" style="display:flex; flex-direction:column; gap:14px;">
+      <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+      <input type="hidden" name="email" value="{{ .Email }}">
+
+      <label>
+        <span style="display:block; font-size:0.875rem; color:var(--md-sys-color-on-surface-variant);">Subject</span>
+        <input type="text" name="subject" required maxlength="200" value="{{ .State.Subject }}" placeholder="Out of office" style="width:100%; padding:8px;">
+      </label>
+
+      <label>
+        <span style="display:block; font-size:0.875rem; color:var(--md-sys-color-on-surface-variant);">Body</span>
+        <textarea name="body" required rows="6" placeholder="I'm away until next Monday. I'll reply when I'm back." style="width:100%; padding:8px; font-family:inherit;">{{ .State.Body }}</textarea>
+      </label>
+
+      <div style="display:flex; gap:14px;">
+        <label style="flex:1;">
+          <span style="display:block; font-size:0.875rem; color:var(--md-sys-color-on-surface-variant);">Start date (optional)</span>
+          <input type="date" name="start" value="{{ .State.Start }}" style="width:100%; padding:8px;">
+        </label>
+        <label style="flex:1;">
+          <span style="display:block; font-size:0.875rem; color:var(--md-sys-color-on-surface-variant);">End date (optional)</span>
+          <input type="date" name="end" value="{{ .State.End }}" style="width:100%; padding:8px;">
+        </label>
+      </div>
+
+      <label style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" name="enabled" value="1" {{ if .State.Enabled }}checked{{ end }}>
+        <span>Enable auto-reply</span>
+      </label>
+
+      <div style="display:flex; gap:12px; margin-top:8px;">
+        <button type="submit" class="c-button c-button--filled" {{ if not .Configured }}disabled{{ end }}><span class="c-button__label">Save</span></button>
+        <a href="/admin/mail" class="c-button c-button--outlined"><span class="c-button__label">Cancel</span></a>
+      </div>
+    </form>
+  </div>
+</article>
+
+{{ end }}
+{{ end }}

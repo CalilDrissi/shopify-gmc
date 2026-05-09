@@ -33,6 +33,22 @@
     Mailbox <code>{{ .Email }}</code> suspended (auth rejected; mail still delivers).
     {{- else if eq .Kind "unsuspend" }}
     Mailbox <code>{{ .Email }}</code> unsuspended.
+    {{- else if eq .Kind "vacation-on" }}
+    Vacation auto-reply <strong>enabled</strong> for <code>{{ .Email }}</code>.
+    {{- else if eq .Kind "vacation-off" }}
+    Vacation auto-reply <strong>disabled</strong> for <code>{{ .Email }}</code>.
+    {{- else if eq .Kind "filter-add" }}
+    Filter rule for <code>{{ .Email }}</code> added (<strong>{{ .Right }}</strong>).
+    {{- else if eq .Kind "filter-del" }}
+    Filter rule #<strong>{{ .Right }}</strong> for <code>{{ .Email }}</code> removed.
+    {{- else if eq .Kind "spam-add" }}
+    Added to <strong>{{ .Right }}</strong> for <code>{{ .Email }}</code>.
+    {{- else if eq .Kind "spam-del" }}
+    Removed from <strong>{{ .Right }}</strong> for <code>{{ .Email }}</code>.
+    {{- else if eq .Kind "spam-threshold" }}
+    Spam threshold for <code>{{ .Email }}</code> set to <strong>{{ .Right }}</strong>.
+    {{- else if eq .Kind "spam-threshold-norspamd" }}
+    Threshold saved for <code>{{ .Email }}</code> — rspamd is not running, so score-based filtering won't fire until it's installed.
     {{- else if eq .Kind "alias" }}
     Alias <code>{{ .Email }}</code> → <code>{{ .Right }}</code> created.
     {{- else if eq .Kind "unalias" }}
@@ -102,6 +118,7 @@
           <th style="padding:8px 0; text-align:right;">Used</th>
           <th style="padding:8px 0; text-align:right;">Quota</th>
           <th style="padding:8px 0;">Set quota</th>
+          <th style="padding:8px 0;">Vacation</th>
           <th></th>
         </tr>
       </thead>
@@ -130,6 +147,9 @@
             <span style="background:#b3261e; color:white; padding:2px 8px; border-radius:10px; font-size:0.75rem; margin-right:4px;">suspended</span>
             {{- end }}
             <a href="/admin/mail/activity?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Recent mail.log activity for {{ .Email }}"><span class="c-button__label">Activity</span></a>
+            <a href="/admin/mail/vacation?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Vacation auto-reply"><span class="c-button__label">Vacation</span>{{ if .Vacation.Enabled }} <span style="margin-left:4px; padding:1px 6px; border-radius:8px; background:#1b873f; color:#fff; font-size:0.7rem;">on</span>{{ end }}</a>
+            <a href="/admin/mail/filters?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Inbox filter rules"><span class="c-button__label">Filters</span></a>
+            <a href="/admin/mail/spam?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Whitelist / blacklist / threshold"><span class="c-button__label">Spam</span></a>
             <form method="post" action="/admin/mail/suspend" style="margin:0;">
               <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
               <input type="hidden" name="email" value="{{ .Email }}">

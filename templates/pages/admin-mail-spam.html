@@ -1,0 +1,129 @@
+{{ define "content" }}
+{{ with .Data }}
+<header style="display:flex; align-items:baseline; justify-content:space-between; gap:16px;">
+  <div>
+    <p style="margin:0 0 4px;"><a href="/admin/mail" style="color:var(--md-sys-color-primary);">← Back to Mail</a></p>
+    <h1 class="page-title" style="margin:0;">Spam settings · <code>{{ .Email }}</code></h1>
+  </div>
+  {{- if not .Configured }}
+  <p style="color:var(--md-sys-color-on-surface-variant); margin:0;">Mail server not configured on this host.</p>
+  {{- end }}
+</header>
+
+{{- if not .Rspamd }}
+<article class="c-card c-card--outlined" style="margin-top:16px; border-color:#b3261e;">
+  <div class="c-card__body">
+    <strong style="color:#b3261e;">rspamd not installed:</strong> threshold rules won't fire until rspamd is running and writing <code>X-Spam-Score</code> headers. Whitelist + blacklist still work.
+    <p style="margin:6px 0 0; color:var(--md-sys-color-on-surface-variant);">Install rspamd to enable score-based filtering.</p>
+  </div>
+</article>
+{{- end }}
+
+{{- if .Result }}
+{{- with .Result }}
+<article class="c-card c-card--elevated" style="margin-top:16px; border-left:4px solid {{ if eq .Kind `error` }}#b3261e{{ else }}#1b873f{{ end }};">
+  <div class="c-card__body">
+    {{- if eq .Kind "error" }}
+    <strong style="color:#b3261e;">Error:</strong> {{ .Payload }}
+    {{- else if eq .Kind "spam-add" }}
+    Added <code>{{ .Right }}</code> to <strong>{{ .Email }}</strong>.
+    {{- else if eq .Kind "spam-del" }}
+    Removed <code>{{ .Right }}</code> from <strong>{{ .Email }}</strong>.
+    {{- else if eq .Kind "spam-threshold" }}
+    Threshold set to <strong>{{ .Payload }}</strong>.
+    {{- else if eq .Kind "spam-threshold-norspamd" }}
+    Threshold saved as <strong>{{ .Payload }}</strong>, but rspamd isn't installed — the rule won't fire until it is.
+    {{- end }}
+  </div>
+</article>
+{{- end }}
+{{- end }}
+
+<section style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px;">
+  <article class="c-card c-card--outlined">
+    <div class="c-card__header"><h2 class="c-card__title">Whitelist · {{ len .State.Whitelist }}</h2></div>
+    <div class="c-card__body">
+      <p style="color:var(--md-sys-color-on-surface-variant); margin:0 0 12px;">Senders here always reach the inbox — they bypass the blacklist + threshold.</p>
+      <form method="post" action="/admin/mail/spam/add" style="display:flex; gap:6px; margin-bottom:12px;">
+        <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+        <input type="hidden" name="email" value="{{ .Email }}">
+        <input type="hidden" name="list" value="whitelist">
+        <input type="email" name="addr" required placeholder="trusted@example.com" style="flex:1; padding:8px;">
+        <button type="submit" class="c-button c-button--filled c-button--small" {{ if not .Configured }}disabled{{ end }}><span class="c-button__label">Allow</span></button>
+      </form>
+      {{- if .State.Whitelist }}
+      <ul style="list-style:none; padding:0; margin:0;">
+        {{- range .State.Whitelist }}
+        <li style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid var(--md-sys-color-outline-variant);">
+          <code>{{ . }}</code>
+          <form method="post" action="/admin/mail/spam/del" style="margin:0;">
+            <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+            <input type="hidden" name="email" value="{{ $.Data.Email }}">
+            <input type="hidden" name="list" value="whitelist">
+            <input type="hidden" name="addr" value="{{ . }}">
+            <button type="submit" class="c-button c-button--outlined c-button--small"><span class="c-button__label">Remove</span></button>
+          </form>
+        </li>
+        {{- end }}
+      </ul>
+      {{- else }}
+      <p style="color:var(--md-sys-color-on-surface-variant); margin:0;">No whitelisted senders.</p>
+      {{- end }}
+    </div>
+  </article>
+
+  <article class="c-card c-card--outlined">
+    <div class="c-card__header"><h2 class="c-card__title">Blacklist · {{ len .State.Blacklist }}</h2></div>
+    <div class="c-card__body">
+      <p style="color:var(--md-sys-color-on-surface-variant); margin:0 0 12px;">Mail from these senders is filed straight to <code>Junk</code>.</p>
+      <form method="post" action="/admin/mail/spam/add" style="display:flex; gap:6px; margin-bottom:12px;">
+        <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+        <input type="hidden" name="email" value="{{ .Email }}">
+        <input type="hidden" name="list" value="blacklist">
+        <input type="email" name="addr" required placeholder="spammer@example.com" style="flex:1; padding:8px;">
+        <button type="submit" class="c-button c-button--filled c-button--small" {{ if not .Configured }}disabled{{ end }}><span class="c-button__label">Block</span></button>
+      </form>
+      {{- if .State.Blacklist }}
+      <ul style="list-style:none; padding:0; margin:0;">
+        {{- range .State.Blacklist }}
+        <li style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid var(--md-sys-color-outline-variant);">
+          <code>{{ . }}</code>
+          <form method="post" action="/admin/mail/spam/del" style="margin:0;">
+            <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+            <input type="hidden" name="email" value="{{ $.Data.Email }}">
+            <input type="hidden" name="list" value="blacklist">
+            <input type="hidden" name="addr" value="{{ . }}">
+            <button type="submit" class="c-button c-button--outlined c-button--small"><span class="c-button__label">Remove</span></button>
+          </form>
+        </li>
+        {{- end }}
+      </ul>
+      {{- else }}
+      <p style="color:var(--md-sys-color-on-surface-variant); margin:0;">No blacklisted senders.</p>
+      {{- end }}
+    </div>
+  </article>
+</section>
+
+<article class="c-card c-card--outlined" style="margin-top:24px;">
+  <div class="c-card__header"><h2 class="c-card__title">Spam-score threshold</h2></div>
+  <div class="c-card__body">
+    <p style="color:var(--md-sys-color-on-surface-variant); margin:0 0 12px;">
+      Mail with an <code>X-Spam-Score</code> header at or above this number is filed to <code>Junk</code>. Typical: <code>5.0</code> aggressive, <code>8.0</code> conservative. Empty or <code>none</code> disables.
+    </p>
+    <form method="post" action="/admin/mail/spam/threshold" style="display:flex; gap:6px; align-items:center;">
+      <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+      <input type="hidden" name="email" value="{{ .Email }}">
+      <input type="text" name="score" value="{{ .State.Threshold }}" placeholder="8.0 / none" pattern="^([0-9]+(\.[0-9]+)?|none)?$" style="width:140px; padding:8px;" {{ if not .Rspamd }}disabled title="Install rspamd to enable score-based filtering"{{ end }}>
+      <button type="submit" class="c-button c-button--filled c-button--small" {{ if or (not .Configured) (not .Rspamd) }}disabled{{ end }}><span class="c-button__label">Save threshold</span></button>
+      {{- if not .Rspamd }}
+      <span style="color:var(--md-sys-color-on-surface-variant);">Install rspamd to enable score-based filtering.</span>
+      {{- else if .State.Threshold }}
+      <span style="color:var(--md-sys-color-on-surface-variant);">Currently active at <code>{{ .State.Threshold }}</code>.</span>
+      {{- end }}
+    </form>
+  </div>
+</article>
+
+{{ end }}
+{{ end }}
