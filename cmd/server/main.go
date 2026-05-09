@@ -121,6 +121,40 @@ func main() {
 			}
 			return a / b
 		},
+		// humanBytes renders 1024-base sizes for the /admin/mail page.
+		// Picks the largest unit where the value is >= 1; one decimal except
+		// for bytes. 0 → "0 B" (cleaner than "0.0 B").
+		"humanBytes": func(n int64) string {
+			if n <= 0 {
+				return "0 B"
+			}
+			const k = 1024
+			if n < k {
+				return fmt.Sprintf("%d B", n)
+			}
+			div, exp := int64(k), 0
+			for x := n / k; x >= k; x /= k {
+				div *= k
+				exp++
+			}
+			units := []string{"KB", "MB", "GB", "TB", "PB"}
+			if exp >= len(units) {
+				exp = len(units) - 1
+			}
+			return fmt.Sprintf("%.1f %s", float64(n)/float64(div), units[exp])
+		},
+		// pctUsed = used*100/quota, clamped to [0,100]. Returns 0 when quota
+		// is 0 (unlimited) so the >=90% red-cell check is correctly false.
+		"pctUsed": func(used, quota int64) int {
+			if quota <= 0 || used <= 0 {
+				return 0
+			}
+			p := used * 100 / quota
+			if p > 100 {
+				return 100
+			}
+			return int(p)
+		},
 	})
 	if err := rend.LoadPartials("templates/partials/*.html"); err != nil {
 		log.Fatalf("load partials: %v", err)
@@ -395,6 +429,7 @@ func main() {
 	mux.HandleFunc("POST /admin/mail/del", adminH.MailDel)
 	mux.HandleFunc("POST /admin/mail/alias", adminH.MailAlias)
 	mux.HandleFunc("POST /admin/mail/unalias", adminH.MailUnalias)
+	mux.HandleFunc("POST /admin/mail/quota", adminH.MailQuota)
 	mux.HandleFunc("GET /admin/settings", adminH.SettingsPage)
 	mux.HandleFunc("POST /admin/settings", adminH.SettingsSave)
 	mux.HandleFunc("GET /admin/settings/test-connection", adminH.SettingsTestConnection)

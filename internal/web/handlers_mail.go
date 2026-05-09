@@ -20,9 +20,17 @@ const (
 	mailboxBinary = "/usr/local/bin/mailbox"
 	dovecotUsers  = "/etc/dovecot/users"
 	postfixAlias  = "/etc/postfix/virtual"
+	vmailBase     = "/var/mail/vmail"
+	defaultQuota  = "1G" // mirrors deploy/mailbox DEFAULT_QUOTA
 )
 
-var emailRE = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
+var (
+	emailRE = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
+	// quota size: digits + optional K/M/G/T, or "0", or empty (unlimited / default)
+	quotaSizeRE = regexp.MustCompile(`^([0-9]+[KMGTkmgt]?)?$`)
+	// extracts SIZE from "userdb_quota_rule=*:storage=1G" anywhere on the line
+	quotaRuleRE = regexp.MustCompile(`userdb_quota_rule=\*:storage=([0-9]+[KMGTkmgt]?)`)
+)
 
 // MailPage lists every mailbox + alias on the host. Admin-only.
 //
@@ -212,6 +220,48 @@ func (h *AdminHandlers) MailUnalias(w http.ResponseWriter, r *http.Request) {
 	mailRedirect(w, r, "unalias", from)
 }
 
+// MailQuota sets a per-mailbox storage quota. Empty size clears the
+// override (falls back to the system default); "0" means unlimited.
+// Anything else must match `quotaSizeRE` (e.g. "1G", "500M", "2K").
+func (h *AdminHandlers) MailQuota(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	if !mailboxConfigured() {
+		http.Error(w, "mail not configured on this host", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	size := strings.TrimSpace(r.FormValue("size"))
+	if !emailRE.MatchString(email) {
+		mailRedirect(w, r, "error", "invalid email")
+		return
+	}
+	if !quotaSizeRE.MatchString(size) {
+		mailRedirect(w, r, "error", "bad size (use 1G, 500M, 2K, 0=unlimited, or empty=default)")
+		return
+	}
+	args := []string{mailboxBinary, "quota", email}
+	if size != "" {
+		args = append(args, size)
+	}
+	if _, err := runSudo(args...); err != nil {
+		mailRedirect(w, r, "error", trimOut(err.Error()))
+		return
+	}
+	display := size
+	if display == "" {
+		display = "default"
+	}
+	mailRedirect(w, r, "quota", email+"|"+display)
+}
+
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
@@ -235,15 +285,27 @@ func runSudo(args ...string) (string, error) {
 	return string(out), err
 }
 
+// Mailbox is one row in /etc/dovecot/users with disk usage joined in.
+// UsedBytes comes from the maildir's `maildirsize` file (Dovecot writes
+// it on every delivery / quota recalc — read is one stat + small file
+// read, so listing every mailbox stays cheap).
+type Mailbox struct {
+	Email      string
+	UsedBytes  int64
+	QuotaBytes int64 // 0 means unlimited
+}
+
 // readMailboxes parses /etc/dovecot/users (one mailbox per line, fields
-// colon-separated). The page only needs the email, not the hash.
-func readMailboxes() ([]string, error) {
+// colon-separated). For each row we also resolve the per-mailbox quota
+// override (8th-field `userdb_quota_rule=*:storage=<size>`, falling
+// back to defaultQuota) and the current usage from `maildirsize`.
+func readMailboxes() ([]Mailbox, error) {
 	f, err := os.Open(dovecotUsers)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	var out []string
+	var out []Mailbox
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		line := strings.TrimSpace(s.Text())
@@ -254,10 +316,111 @@ func readMailboxes() ([]string, error) {
 		if i <= 0 {
 			continue
 		}
-		out = append(out, line[:i])
+		email := line[:i]
+		size := defaultQuota
+		if m := quotaRuleRE.FindStringSubmatch(line); len(m) == 2 {
+			size = m[1]
+		}
+		quotaBytes, _ := parseSizeBytes(size)
+		used := maildirsizeUsedBytes(maildirsizePath(email))
+		out = append(out, Mailbox{Email: email, UsedBytes: used, QuotaBytes: quotaBytes})
 	}
-	sort.Strings(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].Email < out[j].Email })
 	return out, s.Err()
+}
+
+// maildirsizePath maps "user@domain" → "/var/mail/vmail/domain/user/maildirsize".
+func maildirsizePath(email string) string {
+	at := strings.LastIndex(email, "@")
+	if at <= 0 || at == len(email)-1 {
+		return ""
+	}
+	return vmailBase + "/" + email[at+1:] + "/" + email[:at] + "/maildirsize"
+}
+
+// parseSizeBytes parses Dovecot quota sizes ("1G", "500M", "2K", "0", "").
+// Empty or "0" → 0 (unlimited).
+func parseSizeBytes(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "0" {
+		return 0, nil
+	}
+	mult := int64(1)
+	last := s[len(s)-1]
+	switch last {
+	case 'k', 'K':
+		mult = 1024
+		s = s[:len(s)-1]
+	case 'm', 'M':
+		mult = 1024 * 1024
+		s = s[:len(s)-1]
+	case 'g', 'G':
+		mult = 1024 * 1024 * 1024
+		s = s[:len(s)-1]
+	case 't', 'T':
+		mult = 1024 * 1024 * 1024 * 1024
+		s = s[:len(s)-1]
+	}
+	var n int64
+	if _, err := fmt.Sscanf(s, "%d", &n); err != nil {
+		return 0, err
+	}
+	return n * mult, nil
+}
+
+// maildirsizeUsedBytes parses Dovecot's maildirsize file format:
+//
+//	<bytes>S<rule>\n
+//	+<add_bytes> <add_msgs>\n
+//	-<sub_bytes> <sub_msgs>\n
+//
+// Returns the running sum (clamped at 0) so we don't render negative usage.
+// Missing or unreadable file → 0; a brand-new mailbox simply hasn't been
+// written to yet, which is correct.
+func maildirsizeUsedBytes(path string) int64 {
+	if path == "" {
+		return 0
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+	var total int64
+	s := bufio.NewScanner(f)
+	first := true
+	for s.Scan() {
+		line := strings.TrimSpace(s.Text())
+		if line == "" {
+			continue
+		}
+		if first {
+			first = false
+			// strip trailing "S<rule>" — read leading digits only
+			end := 0
+			for end < len(line) && line[end] >= '0' && line[end] <= '9' {
+				end++
+			}
+			if end > 0 {
+				var n int64
+				fmt.Sscanf(line[:end], "%d", &n)
+				total += n
+			}
+			continue
+		}
+		// "+1234 5" or "-1234 5" — first whitespace-delimited token
+		parts := strings.Fields(line)
+		if len(parts) == 0 {
+			continue
+		}
+		var n int64
+		fmt.Sscanf(parts[0], "%d", &n)
+		total += n
+	}
+	if total < 0 {
+		return 0
+	}
+	return total
 }
 
 // MailAlias is a from→to pair.

@@ -9,6 +9,11 @@
 #                                  alias)
 #   mailbox unalias FROM           remove an alias
 #   mailbox list                   list mailboxes + aliases
+#   mailbox quota EMAIL [SIZE]     set per-mailbox quota (1G, 500M, 0=unlimited;
+#                                  empty = remove override → falls back to default)
+#   mailbox usage [EMAIL]          print TSV email<TAB>used_bytes<TAB>quota_bytes
+#                                  (one line per mailbox, or just EMAIL if given)
+#   mailbox recalc EMAIL           wraps doveadm quota recalc — repairs maildirsize
 set -euo pipefail
 
 DOMAIN_RE='^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
@@ -16,6 +21,7 @@ USERS=/etc/dovecot/users
 VMAILBOX=/etc/postfix/vmailbox
 VIRTUAL=/etc/postfix/virtual
 VMAIL_BASE=/var/mail/vmail
+DEFAULT_QUOTA=1G   # cPanel-default-style 1GB; admin can override per-mailbox
 
 require_root() {
   [ "$EUID" -eq 0 ] || { echo "must run as root"; exit 1; }
@@ -29,6 +35,39 @@ gen_pw() {
 local_part() { echo "$1" | cut -d@ -f1; }
 domain_of()  { echo "$1" | cut -d@ -f2; }
 
+# parse_size_to_bytes "1G" → 1073741824, "500M" → 524288000, "0" → 0
+parse_size_to_bytes() {
+  local s="${1:-}"
+  [ -z "$s" ] && { echo 0; return; }
+  case "$s" in
+    *[Kk]) echo $(( ${s%[Kk]} * 1024 )) ;;
+    *[Mm]) echo $(( ${s%[Mm]} * 1024 * 1024 )) ;;
+    *[Gg]) echo $(( ${s%[Gg]} * 1024 * 1024 * 1024 )) ;;
+    *[Tt]) echo $(( ${s%[Tt]} * 1024 * 1024 * 1024 * 1024 )) ;;
+    *)     echo "$s" ;;
+  esac
+}
+
+# extract_quota_size <user line> — pulls the SIZE token from
+# "userdb_quota_rule=*:storage=1G" and prints "1G"; empty if not set.
+extract_quota_size() {
+  local line="$1"
+  if [[ "$line" =~ userdb_quota_rule=\*:storage=([0-9]+[KMGTkmgt]?) ]]; then
+    echo "${BASH_REMATCH[1]}"
+  fi
+}
+
+# Compose a line's 8th field. If $1 is non-empty, sets the quota rule;
+# if empty, no rule (Dovecot's plugin defaults apply).
+quota_field_for() {
+  local size="${1:-}"
+  if [ -z "$size" ] || [ "$size" = "0" ]; then
+    echo ""
+  else
+    echo "userdb_quota_rule=*:storage=$size"
+  fi
+}
+
 cmd_add() {
   local email="${1:?email required}" pw="${2:-}"
   require_email "$email"
@@ -39,7 +78,8 @@ cmd_add() {
   [ -z "$pw" ] && pw=$(gen_pw)
 
   local hash; hash=$(doveadm pw -s ARGON2ID -p "$pw")
-  echo "$email:$hash:5000:5000::$VMAIL_BASE/$domain/$local::" >> "$USERS"
+  local extra; extra=$(quota_field_for "$DEFAULT_QUOTA")
+  echo "$email:$hash:5000:5000::$VMAIL_BASE/$domain/$local::$extra" >> "$USERS"
   install -d -o vmail -g vmail -m 0700 "$VMAIL_BASE/$domain/$local"
 
   echo "$email    $domain/$local/" >> "$VMAILBOX"
@@ -47,19 +87,25 @@ cmd_add() {
 
   echo "ok: $email created"
   echo "    password: $pw"
-  echo "    (record it — not retrievable later)"
+  echo "    quota:    $DEFAULT_QUOTA"
+  echo "    (record the password — not retrievable later)"
 }
 
 cmd_passwd() {
   local email="${1:?email required}" pw="${2:-}"
   require_email "$email"
-  grep -q "^$email:" "$USERS" || { echo "no such mailbox: $email"; exit 1; }
+  local existing; existing=$(grep "^$email:" "$USERS" || true)
+  [ -n "$existing" ] || { echo "no such mailbox: $email"; exit 1; }
   [ -z "$pw" ] && pw=$(gen_pw)
   local hash; hash=$(doveadm pw -s ARGON2ID -p "$pw")
-  # Replace the line in-place
-  sed -i "\|^$email:|d" "$USERS"
+
+  # Preserve the existing 8th-field (quota override etc.) across rotation —
+  # otherwise rotating a password silently erases per-mailbox quota.
+  local prior_extra; prior_extra=$(printf '%s\n' "$existing" | awk -F: 'BEGIN{OFS=":"} {n=NF; out=$8; for(i=9;i<=n;i++) out=out":"$i; print out}')
   local local=$(local_part "$email") domain=$(domain_of "$email")
-  echo "$email:$hash:5000:5000::$VMAIL_BASE/$domain/$local::" >> "$USERS"
+
+  sed -i "\|^$email:|d" "$USERS"
+  echo "$email:$hash:5000:5000::$VMAIL_BASE/$domain/$local::$prior_extra" >> "$USERS"
   echo "ok: password rotated for $email"
   echo "    new password: $pw"
 }
@@ -102,18 +148,97 @@ cmd_list() {
   awk 'NF==2 {printf "  %-35s → %s\n", $1, $2}' "$VIRTUAL" | sort
 }
 
+# --- quota / usage / recalc -------------------------------------------------
+
+cmd_quota() {
+  local email="${1:?email required}" size="${2:-}"
+  require_email "$email"
+  local existing; existing=$(grep "^$email:" "$USERS" || true)
+  [ -n "$existing" ] || { echo "no such mailbox: $email"; exit 1; }
+
+  # Validate size syntax: digits + optional K/M/G/T, or 0, or empty
+  if [ -n "$size" ] && [ "$size" != "0" ] && ! [[ "$size" =~ ^[0-9]+[KMGTkmgt]?$ ]]; then
+    echo "bad size: $size (use 1G, 500M, 2K, 0=unlimited, or empty=default)"; exit 1
+  fi
+
+  # Rebuild the line's 8th field with the new quota rule, preserving the
+  # rest of the line via awk.
+  local extra; extra=$(quota_field_for "$size")
+  local rebuilt; rebuilt=$(printf '%s\n' "$existing" | awk -F: -v ex="$extra" 'BEGIN{OFS=":"} { print $1,$2,$3,$4,$5,$6,$7,ex }')
+
+  sed -i "\|^$email:|d" "$USERS"
+  echo "$rebuilt" >> "$USERS"
+
+  # Force Dovecot to pick up the new rule + recalc the mailbox's usage so
+  # the next read sees the correct ratio.
+  doveadm reload >/dev/null 2>&1 || true
+  doveadm quota recalc -u "$email" 2>/dev/null || true
+
+  echo "ok: quota for $email = ${size:-default ($DEFAULT_QUOTA)}"
+}
+
+# Read the maildirsize file's first line and extract the integer used-bytes.
+# Format per Dovecot docs:
+#   <bytes>S<rule>\n
+#   +<add_bytes> <add_msgs>\n
+#   -<sub_bytes> <sub_msgs>\n
+# We sum the first line + every +/- delta.
+maildirsize_used_bytes() {
+  local path="$1"
+  [ -f "$path" ] || { echo 0; return; }
+  awk 'NR==1 { match($0,/^[0-9]+/); used+=substr($0,RSTART,RLENGTH); next }
+       /^[+-]/ { used+=$1 }
+       END { print (used<0)?0:used }' "$path"
+}
+
+cmd_usage() {
+  local one="${1:-}"
+  emit_one() {
+    local email="$1"
+    local local=$(local_part "$email") domain=$(domain_of "$email")
+    local user_line; user_line=$(grep "^$email:" "$USERS" || true)
+    local size_token; size_token=$(extract_quota_size "$user_line")
+    [ -z "$size_token" ] && size_token="$DEFAULT_QUOTA"
+    local quota_bytes; quota_bytes=$(parse_size_to_bytes "$size_token")
+    local used; used=$(maildirsize_used_bytes "$VMAIL_BASE/$domain/$local/maildirsize")
+    printf '%s\t%s\t%s\n' "$email" "$used" "$quota_bytes"
+  }
+
+  if [ -n "$one" ]; then
+    require_email "$one"
+    grep -q "^$one:" "$USERS" || { echo "no such mailbox: $one"; exit 1; }
+    emit_one "$one"
+  else
+    awk -F: '{print $1}' "$USERS" | sort | while read -r e; do emit_one "$e"; done
+  fi
+}
+
+cmd_recalc() {
+  local email="${1:?email required}"
+  require_email "$email"
+  doveadm quota recalc -u "$email"
+  echo "ok: recalculated quota for $email"
+}
+
 usage() {
   sed -n '/^# mailbox/,/^set -e/p' "$0" | sed 's/^# *//; /^$/q'
   exit 2
 }
 
-require_root
-case "${1:-}" in
-  add)     shift; cmd_add "$@" ;;
-  passwd)  shift; cmd_passwd "$@" ;;
-  del)     shift; cmd_del "$@" ;;
-  alias)   shift; cmd_alias "$@" ;;
-  unalias) shift; cmd_unalias "$@" ;;
-  list)    cmd_list ;;
-  *)       usage ;;
-esac
+# Only dispatch when invoked directly — `source mailbox` skips this so
+# the helpers can be unit-tested standalone.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  require_root
+  case "${1:-}" in
+    add)     shift; cmd_add "$@" ;;
+    passwd)  shift; cmd_passwd "$@" ;;
+    del)     shift; cmd_del "$@" ;;
+    alias)   shift; cmd_alias "$@" ;;
+    unalias) shift; cmd_unalias "$@" ;;
+    list)    cmd_list ;;
+    quota)   shift; cmd_quota "$@" ;;
+    usage)   shift; cmd_usage "$@" ;;
+    recalc)  shift; cmd_recalc "$@" ;;
+    *)       usage ;;
+  esac
+fi

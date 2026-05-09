@@ -139,9 +139,38 @@ passdb {
   driver = passwd-file
   args = scheme=ARGON2ID username_format=%u /etc/dovecot/users
 }
+# passwd-file (not static) so Dovecot reads the per-user 8th-field extras —
+# specifically `userdb_quota_rule=*:storage=<size>` for per-mailbox quotas.
+# `default_fields` keeps the static defaults (uid/gid/home) when the line
+# omits them, which is exactly what /etc/dovecot/users looks like.
 userdb {
-  driver = static
-  args = uid=vmail gid=vmail home=/var/mail/vmail/%d/%n
+  driver = passwd-file
+  args = username_format=%u /etc/dovecot/users
+  default_fields = uid=vmail gid=vmail home=/var/mail/vmail/%d/%n
+}
+
+# Quota plugin — maildir backend keeps a `maildirsize` file per mailbox so
+# reads stay cheap (no `du`). Default = 1G, overridable per-mailbox via the
+# `userdb_quota_rule` extra field on the user's line.
+mail_plugins = $mail_plugins quota
+protocol imap { mail_plugins = $mail_plugins quota imap_quota }
+protocol lmtp { mail_plugins = $mail_plugins quota }
+plugin {
+  quota = maildir:User quota
+  quota_rule  = *:storage=1G
+  quota_rule2 = Trash:storage=+100M
+  quota_status_success    = DUNNO
+  quota_status_nouser     = DUNNO
+  quota_status_overquota  = "552 5.2.2 Mailbox is full / Quota exceeded"
+}
+
+# Postfix queries this socket pre-DATA to bounce over-quota recipients with
+# a real 552 DSN instead of accepting then dropping silently.
+service quota-status {
+  executable = quota-status -p postfix
+  unix_listener /var/spool/postfix/private/quota-status {
+    user = postfix
+  }
 }
 
 # TLS: use Caddy's Let's Encrypt cert (path resolved in the wrapper script
@@ -238,8 +267,43 @@ sed -i "s/PLACEHOLDER_DES_KEY_REPLACED_BELOW/$DES_KEY/" /etc/roundcube/config.in
 install -d -o www-data -g www-data /var/lib/roundcube
 chown -R www-data:www-data /var/lib/roundcube
 
-# Reload everything
-systemctl restart php*-fpm dovecot postfix
+# --- Postfix: wire the quota policy service into recipient restrictions ---
+# Append `check_policy_service unix:private/quota-status` only if not present.
+# We append rather than overwrite so we don't clobber any other restrictions
+# the operator has added (anti-spam, RBLs, etc.).
+log "wiring Postfix quota policy"
+current_rcpt=$(postconf -h smtpd_recipient_restrictions 2>/dev/null || true)
+if [[ "$current_rcpt" != *"check_policy_service unix:private/quota-status"* ]]; then
+  if [ -z "$current_rcpt" ]; then
+    new_rcpt="permit_mynetworks, reject_unauth_destination, check_policy_service unix:private/quota-status"
+  else
+    new_rcpt="$current_rcpt, check_policy_service unix:private/quota-status"
+  fi
+  postconf -e "smtpd_recipient_restrictions = $new_rcpt"
+fi
+
+# --- Reload + baseline existing mailboxes ---
+systemctl restart php*-fpm
+# `doveconf -n` exits non-zero on parse error — bail before reload to avoid
+# leaving Dovecot in a broken state on a typo in local.conf.
+if ! doveconf -n >/dev/null 2>&1; then
+  log "ERROR: doveconf -n rejected the new config; not reloading dovecot"
+  doveconf -n 2>&1 | tail -20
+  exit 1
+fi
+systemctl reload dovecot
+systemctl reload postfix
 systemctl reload caddy
 
-log "DONE — to add a mailbox: doveadm pw -s ARGON2ID + append to /etc/dovecot/users"
+# Recalc every existing mailbox so the new quota plugin has an accurate
+# baseline maildirsize for boxes that pre-date this rollout. Idempotent:
+# re-running just rewrites maildirsize from current state.
+if [ -f /etc/dovecot/users ]; then
+  log "recalculating quota for existing mailboxes"
+  awk -F: '{print $1}' /etc/dovecot/users | while read -r u; do
+    [ -n "$u" ] || continue
+    doveadm quota recalc -u "$u" >/dev/null 2>&1 || true
+  done
+fi
+
+log "DONE — to add a mailbox: mailbox add user@shopifygmc.com (CLI installs default 1G quota)"
