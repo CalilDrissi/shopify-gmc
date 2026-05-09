@@ -44,6 +44,8 @@ var (
 	quotaSizeRE = regexp.MustCompile(`^([0-9]+[KMGTkmgt]?)?$`)
 	// extracts SIZE from "userdb_quota_rule=*:storage=1G" anywhere on the line
 	quotaRuleRE = regexp.MustCompile(`userdb_quota_rule=\*:storage=([0-9]+[KMGTkmgt]?)`)
+	// nopassword=y in the 8th-field extras → mailbox is suspended (auth rejected).
+	suspendedRE = regexp.MustCompile(`(^|[\s:])nopassword=y(\s|$)`)
 )
 
 // MailPage lists every mailbox + alias on the host. Admin-only.
@@ -274,6 +276,40 @@ func (h *AdminHandlers) MailQuota(w http.ResponseWriter, r *http.Request) {
 		display = "default"
 	}
 	mailRedirect(w, r, "quota", email+"|"+display)
+}
+
+// MailSuspend toggles a mailbox's auth state. Form param `action` selects
+// `suspend` (auth rejected, mail still delivers) or `unsuspend` (auth allowed
+// again). The CLI does the in-place edit + doveadm reload; we just dispatch.
+func (h *AdminHandlers) MailSuspend(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	if !mailboxConfigured() {
+		http.Error(w, "mail not configured on this host", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	action := strings.TrimSpace(r.FormValue("action"))
+	if !emailRE.MatchString(email) {
+		mailRedirect(w, r, "error", "invalid email")
+		return
+	}
+	if action != "suspend" && action != "unsuspend" {
+		mailRedirect(w, r, "error", "action must be suspend or unsuspend")
+		return
+	}
+	if _, err := runSudo(mailboxBinary, action, email); err != nil {
+		mailRedirect(w, r, "error", trimOut(err.Error()))
+		return
+	}
+	mailRedirect(w, r, action, email)
 }
 
 // MailActivity renders the last ~200 mail.log entries that touched the given
@@ -589,6 +625,7 @@ type Mailbox struct {
 	Email      string
 	UsedBytes  int64
 	QuotaBytes int64 // 0 means unlimited
+	Suspended  bool
 }
 
 // readMailboxes parses /etc/dovecot/users (one mailbox per line, fields
@@ -619,7 +656,12 @@ func readMailboxes() ([]Mailbox, error) {
 		}
 		quotaBytes, _ := parseSizeBytes(size)
 		used := maildirsizeUsedBytes(maildirsizePath(email))
-		out = append(out, Mailbox{Email: email, UsedBytes: used, QuotaBytes: quotaBytes})
+		out = append(out, Mailbox{
+			Email:      email,
+			UsedBytes:  used,
+			QuotaBytes: quotaBytes,
+			Suspended:  suspendedRE.MatchString(line),
+		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Email < out[j].Email })
 	return out, s.Err()

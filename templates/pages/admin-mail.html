@@ -29,6 +29,10 @@
     Mailbox <code>{{ .Email }}</code> deleted.
     {{- else if eq .Kind "quota" }}
     Quota for <code>{{ .Email }}</code> set to <strong>{{ .Right }}</strong>.
+    {{- else if eq .Kind "suspend" }}
+    Mailbox <code>{{ .Email }}</code> suspended (auth rejected; mail still delivers).
+    {{- else if eq .Kind "unsuspend" }}
+    Mailbox <code>{{ .Email }}</code> unsuspended.
     {{- else if eq .Kind "alias" }}
     Alias <code>{{ .Email }}</code> → <code>{{ .Right }}</code> created.
     {{- else if eq .Kind "unalias" }}
@@ -105,7 +109,12 @@
         {{- range .Mailboxes }}
         {{- $full := ge (pctUsed .UsedBytes .QuotaBytes) 90 }}
         <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
-          <td style="padding:10px 0;"><code>{{ .Email }}</code></td>
+          <td style="padding:10px 0;">
+            <code>{{ .Email }}</code>
+            {{- if .Suspended }}
+            <span style="display:inline-block; margin-left:8px; padding:2px 8px; font-size:0.75rem; font-weight:600; color:#fff; background:#b3261e; border-radius:999px; vertical-align:middle;">suspended</span>
+            {{- end }}
+          </td>
           <td style="padding:10px 0; text-align:right; {{ if $full }}color:#b3261e; font-weight:600;{{ end }}">{{ humanBytes .UsedBytes }}</td>
           <td style="padding:10px 0; text-align:right;">{{ if eq .QuotaBytes 0 }}∞{{ else }}{{ humanBytes .QuotaBytes }}{{ end }}</td>
           <td style="padding:10px 0;">
@@ -117,7 +126,21 @@
             </form>
           </td>
           <td style="padding:10px 0; text-align:right; display:flex; gap:8px; justify-content:flex-end; align-items:center;">
+            {{- if .Suspended }}
+            <span style="background:#b3261e; color:white; padding:2px 8px; border-radius:10px; font-size:0.75rem; margin-right:4px;">suspended</span>
+            {{- end }}
             <a href="/admin/mail/activity?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Recent mail.log activity for {{ .Email }}"><span class="c-button__label">Activity</span></a>
+            <form method="post" action="/admin/mail/suspend" style="margin:0;">
+              <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+              <input type="hidden" name="email" value="{{ .Email }}">
+              {{- if .Suspended }}
+              <input type="hidden" name="action" value="unsuspend">
+              <button type="submit" class="c-button c-button--outlined c-button--small" onclick="return confirm('Unsuspend {{ .Email }}?')"><span class="c-button__label">Unsuspend</span></button>
+              {{- else }}
+              <input type="hidden" name="action" value="suspend">
+              <button type="submit" class="c-button c-button--outlined c-button--small" onclick="return confirm('Suspend {{ .Email }}? Auth will be rejected; mail keeps delivering.')"><span class="c-button__label">Suspend</span></button>
+              {{- end }}
+            </form>
             <form method="post" action="/admin/mail/passwd" style="margin:0;">
               <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
               <input type="hidden" name="email" value="{{ .Email }}">

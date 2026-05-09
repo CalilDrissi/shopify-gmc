@@ -436,6 +436,7 @@ func main() {
 	mux.HandleFunc("GET /admin/mail/import", adminH.MailImportPage)
 	mux.HandleFunc("POST /admin/mail/import", adminH.MailImportSubmit)
 	mux.HandleFunc("GET /admin/mail/activity", adminH.MailActivity)
+	mux.HandleFunc("POST /admin/mail/suspend", adminH.MailSuspend)
 	mux.HandleFunc("GET /admin/settings", adminH.SettingsPage)
 	mux.HandleFunc("POST /admin/settings", adminH.SettingsSave)
 	mux.HandleFunc("GET /admin/settings/test-connection", adminH.SettingsTestConnection)

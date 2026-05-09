@@ -14,6 +14,8 @@
 #   mailbox usage [EMAIL]          print TSV email<TAB>used_bytes<TAB>quota_bytes
 #                                  (one line per mailbox, or just EMAIL if given)
 #   mailbox recalc EMAIL           wraps doveadm quota recalc — repairs maildirsize
+#   mailbox suspend EMAIL          reject auth (mail still delivers; data preserved)
+#   mailbox unsuspend EMAIL        re-enable auth
 set -euo pipefail
 
 DOMAIN_RE='^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
@@ -66,6 +68,39 @@ quota_field_for() {
   else
     echo "userdb_quota_rule=*:storage=$size"
   fi
+}
+
+# Suspend tokens live alongside quota rules in the 8th field.
+# Dovecot's passwd-file parser separates multiple extra fields by whitespace;
+# `nopassword=y` tells the passdb the user has no valid password, so auth is
+# rejected while the userdb entry (and Maildir delivery) keeps working.
+SUSPEND_TOKEN='nopassword=y'
+
+is_suspended_line() {
+  local line="$1"
+  [[ "$line" == *"$SUSPEND_TOKEN"* ]]
+}
+
+# add_suspend_token <existing 8th-field value> — appends nopassword=y if absent.
+add_suspend_token() {
+  local extra="${1:-}"
+  if [[ "$extra" == *"$SUSPEND_TOKEN"* ]]; then
+    echo "$extra"; return
+  fi
+  if [ -z "$extra" ]; then
+    echo "$SUSPEND_TOKEN"
+  else
+    echo "$extra $SUSPEND_TOKEN"
+  fi
+}
+
+# strip_suspend_token <existing 8th-field value> — removes nopassword=y, then
+# normalises whitespace so a stray double-space doesn't sneak back in.
+strip_suspend_token() {
+  local extra="${1:-}"
+  extra="${extra//$SUSPEND_TOKEN/}"
+  extra="$(echo "$extra" | tr -s ' ' | sed 's/^ //; s/ $//')"
+  echo "$extra"
 }
 
 cmd_add() {
@@ -223,6 +258,50 @@ cmd_recalc() {
   echo "ok: recalculated quota for $email"
 }
 
+# --- suspend / unsuspend ----------------------------------------------------
+
+# Rebuild the user line with $new_extra in field 8. Awk handles the case where
+# the existing extra contained colons (e.g. userdb_quota_rule=*:storage=1G)
+# by collecting fields 8..NF — same trick cmd_passwd uses.
+write_extra_field() {
+  local email="$1" new_extra="$2" existing="$3"
+  printf '%s\n' "$existing" | awk -F: -v ex="$new_extra" 'BEGIN{OFS=":"} {
+    print $1,$2,$3,$4,$5,$6,$7,ex
+  }'
+}
+
+cmd_suspend() {
+  local email="${1:?email required}"
+  require_email "$email"
+  local existing; existing=$(grep "^$email:" "$USERS" || true)
+  [ -n "$existing" ] || { echo "no such mailbox: $email"; exit 1; }
+
+  local prior_extra; prior_extra=$(printf '%s\n' "$existing" | awk -F: 'BEGIN{OFS=":"} {n=NF; out=$8; for(i=9;i<=n;i++) out=out":"$i; print out}')
+  local new_extra; new_extra=$(add_suspend_token "$prior_extra")
+  local rebuilt; rebuilt=$(write_extra_field "$email" "$new_extra" "$existing")
+
+  sed -i "\|^$email:|d" "$USERS"
+  echo "$rebuilt" >> "$USERS"
+  doveadm reload >/dev/null 2>&1 || true
+  echo "ok: $email suspended (auth rejected; mail still delivers)"
+}
+
+cmd_unsuspend() {
+  local email="${1:?email required}"
+  require_email "$email"
+  local existing; existing=$(grep "^$email:" "$USERS" || true)
+  [ -n "$existing" ] || { echo "no such mailbox: $email"; exit 1; }
+
+  local prior_extra; prior_extra=$(printf '%s\n' "$existing" | awk -F: 'BEGIN{OFS=":"} {n=NF; out=$8; for(i=9;i<=n;i++) out=out":"$i; print out}')
+  local new_extra; new_extra=$(strip_suspend_token "$prior_extra")
+  local rebuilt; rebuilt=$(write_extra_field "$email" "$new_extra" "$existing")
+
+  sed -i "\|^$email:|d" "$USERS"
+  echo "$rebuilt" >> "$USERS"
+  doveadm reload >/dev/null 2>&1 || true
+  echo "ok: $email unsuspended"
+}
+
 usage() {
   sed -n '/^# mailbox/,/^set -e/p' "$0" | sed 's/^# *//; /^$/q'
   exit 2
@@ -242,6 +321,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     quota)   shift; cmd_quota "$@" ;;
     usage)   shift; cmd_usage "$@" ;;
     recalc)  shift; cmd_recalc "$@" ;;
+    suspend) shift; cmd_suspend "$@" ;;
+    unsuspend) shift; cmd_unsuspend "$@" ;;
     *)       usage ;;
   esac
 fi

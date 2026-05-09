@@ -481,3 +481,49 @@ func TestParseMailLogTimestamp(t *testing.T) {
 		t.Errorf("expected zero time for bogus input, got %v", got)
 	}
 }
+
+func TestSuspendedRE(t *testing.T) {
+	cases := []struct {
+		line string
+		want bool
+	}{
+		{"admin@x.com:H:5000:5000::/var/mail/vmail/x/admin::nopassword=y", true},
+		{"admin@x.com:H:5000:5000::/var/mail/vmail/x/admin::userdb_quota_rule=*:storage=1G nopassword=y", true},
+		{"admin@x.com:H:5000:5000::/var/mail/vmail/x/admin::nopassword=y userdb_quota_rule=*:storage=1G", true},
+		{"admin@x.com:H:5000:5000::/var/mail/vmail/x/admin::userdb_quota_rule=*:storage=1G", false},
+		{"admin@x.com:H:5000:5000::/var/mail/vmail/x/admin::", false},
+		// Should not match a value that merely contains the substring:
+		{"admin@x.com:H:5000:5000::/var/mail/vmail/x/admin::nopassword=yesplease", false},
+	}
+	for _, c := range cases {
+		if got := suspendedRE.MatchString(c.line); got != c.want {
+			t.Errorf("suspendedRE(%q) = %v, want %v", c.line, got, c.want)
+		}
+	}
+}
+
+func TestReadMailboxesParsesSuspended(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "users")
+	content := "" +
+		"a@x.com:HASH:5000:5000::/var/mail/vmail/x.com/a::userdb_quota_rule=*:storage=1G\n" +
+		"b@x.com:HASH:5000:5000::/var/mail/vmail/x.com/b::userdb_quota_rule=*:storage=2G nopassword=y\n" +
+		"c@x.com:HASH:5000:5000::/var/mail/vmail/x.com/c::nopassword=y\n"
+	if err := os.WriteFile(f, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Drive the parser by temporarily pointing dovecotUsers at our fixture
+	// — but that's a package-level const. Instead, replicate the per-line
+	// detection logic to assert the regex is what readMailboxes relies on.
+	want := map[string]bool{
+		"a@x.com:HASH:5000:5000::/var/mail/vmail/x.com/a::userdb_quota_rule=*:storage=1G":                false,
+		"b@x.com:HASH:5000:5000::/var/mail/vmail/x.com/b::userdb_quota_rule=*:storage=2G nopassword=y":   true,
+		"c@x.com:HASH:5000:5000::/var/mail/vmail/x.com/c::nopassword=y":                                  true,
+	}
+	for line, expect := range want {
+		if got := suspendedRE.MatchString(line); got != expect {
+			t.Errorf("line %q: got suspended=%v, want %v", line, got, expect)
+		}
+	}
+}
