@@ -177,18 +177,21 @@ cmd_quota() {
   echo "ok: quota for $email = ${size:-default ($DEFAULT_QUOTA)}"
 }
 
-# Read the maildirsize file's first line and extract the integer used-bytes.
-# Format per Dovecot docs:
-#   <bytes>S<rule>\n
-#   +<add_bytes> <add_msgs>\n
-#   -<sub_bytes> <sub_msgs>\n
-# We sum the first line + every +/- delta.
+# Read the maildirsize file and return the integer used-bytes.
+# Dovecot maildirsize format:
+#   line 1: <quota_bytes>S[<quota_count>C]   ← QUOTA header, not usage
+#   line 2+: <bytes> <msgs>                  ← absolute baseline (after recalc)
+#            +<add_bytes> <add_msgs>         ← deltas on delivery
+#            -<sub_bytes> <sub_msgs>         ← deltas on expunge
+# We SKIP line 1 (it's the quota cap, not a usage value) and sum the leading
+# signed integer of each subsequent line.
 maildirsize_used_bytes() {
   local path="$1"
   [ -f "$path" ] || { echo 0; return; }
-  awk 'NR==1 { match($0,/^[0-9]+/); used+=substr($0,RSTART,RLENGTH); next }
-       /^[+-]/ { used+=$1 }
-       END { print (used<0)?0:used }' "$path"
+  awk 'BEGIN { used = 0 }
+       NR==1 { next }
+       NF>=1 { used += $1 }
+       END   { print (used<0) ? 0 : used+0 }' "$path"
 }
 
 cmd_usage() {

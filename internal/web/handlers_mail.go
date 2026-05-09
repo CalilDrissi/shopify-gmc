@@ -370,13 +370,18 @@ func parseSizeBytes(s string) (int64, error) {
 
 // maildirsizeUsedBytes parses Dovecot's maildirsize file format:
 //
-//	<bytes>S<rule>\n
-//	+<add_bytes> <add_msgs>\n
-//	-<sub_bytes> <sub_msgs>\n
+//	<quota_bytes>S[<quota_count>C]\n     ← line 1: quota header (NOT usage)
+//	<bytes> <msgs>\n                     ← line 2+: absolute baseline written
+//	                                       by `doveadm quota recalc`, OR
+//	+<add_bytes> <add_msgs>\n            ← signed deltas appended on each
+//	-<sub_bytes> <sub_msgs>\n              delivery / expunge
 //
-// Returns the running sum (clamped at 0) so we don't render negative usage.
-// Missing or unreadable file → 0; a brand-new mailbox simply hasn't been
-// written to yet, which is correct.
+// We skip line 1 entirely and sum the leading numeric token from every
+// subsequent line. Returns the running sum (clamped at 0) so transient
+// underflows during heavy expunge don't render negative usage.
+//
+// Missing or unreadable file → 0. A brand-new mailbox simply hasn't had a
+// maildirsize written yet (no deliveries), which is the right answer.
 func maildirsizeUsedBytes(path string) int64 {
 	if path == "" {
 		return 0
@@ -396,19 +401,9 @@ func maildirsizeUsedBytes(path string) int64 {
 		}
 		if first {
 			first = false
-			// strip trailing "S<rule>" — read leading digits only
-			end := 0
-			for end < len(line) && line[end] >= '0' && line[end] <= '9' {
-				end++
-			}
-			if end > 0 {
-				var n int64
-				fmt.Sscanf(line[:end], "%d", &n)
-				total += n
-			}
-			continue
+			continue // quota header — skip, NOT a usage delta
 		}
-		// "+1234 5" or "-1234 5" — first whitespace-delimited token
+		// Parse leading signed integer ("+1234", "-5678", or "1234").
 		parts := strings.Fields(line)
 		if len(parts) == 0 {
 			continue

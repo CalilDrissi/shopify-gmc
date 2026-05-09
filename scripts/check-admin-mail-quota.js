@@ -25,7 +25,8 @@ const SSH_KEY  = process.env.SSH_KEY  || `${process.env.HOME}/.ssh/gmcauditor_de
 
 function ssh(cmd) {
   const sshCmd = `ssh -i ${SSH_KEY} -o IdentitiesOnly=yes -o PasswordAuthentication=no -o StrictHostKeyChecking=no ${SSH_HOST} ${JSON.stringify(cmd)}`;
-  return execSync(sshCmd, { encoding: 'utf8' });
+  // 5 MB buffer covers swaks transcripts on multi-MiB bodies.
+  return execSync(sshCmd, { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024 });
 }
 
 function step(label, fn) {
@@ -92,29 +93,49 @@ function parseUsageLine(line) {
     assert(u.used < 200000, `expected <200 KB used, got ${u.used}`);
   });
 
-  step('5. over-quota message bounces with 552', () => {
-    // 3 MiB body — the second message can't fit in the remaining 2M-quota.
-    // swaks exits non-zero when the SMTP server returns 5xx; capture stderr.
-    let bounced = false;
+  step('5. over-quota mailbox bounces incoming with 552 at SMTP-time', () => {
+    // Dovecot's LMTP refuses deliveries that would push past the cap, so you
+    // can't fill *over* the cap. The realistic over-quota state is "filled
+    // legitimately, then quota was lowered" — e.g. an admin tightening
+    // limits after an account had been growing freely. Reproduce that:
+    //   a) bump quota to 5M and fill ~2.4 MiB across two 1.2 MiB deliveries
+    //   b) lower quota back to 1M — now used > quota
+    //   c) send a tiny message; the policy service sees over-quota and the
+    //      delivery is rejected at SMTP time with 552 5.2.2 Mailbox is full.
+    ssh(`mailbox quota ${email} 5M`);
+    ssh(`for i in 1 2; do ` +
+        `head -c 1200000 /dev/urandom | base64 -w0 > /tmp/fill-${stamp}-$i && ` +
+        `swaks --to ${email} --from postmaster@shopifygmc.com --server localhost:25 ` +
+        `--header "Subject: fill-${stamp}-$i" --body @/tmp/fill-${stamp}-$i >/dev/null 2>&1 ; ` +
+        `rm -f /tmp/fill-${stamp}-$i ; done`);
+    ssh(`sleep 3 && doveadm quota recalc -u ${email}`);
+    ssh(`mailbox quota ${email} 1M`);
+    const u = parseUsageLine(ssh(`mailbox usage ${email}`));
+    if (u.used <= u.quota) {
+      throw new Error(`expected over-quota state, got used=${u.used} quota=${u.quota}`);
+    }
     let outStr = '';
     try {
-      outStr = ssh(`swaks --to ${email} --from postmaster@shopifygmc.com --server localhost:25 ` +
-                   `--header 'Subject: overflow-${stamp}' --body "$(head -c 3000000 /dev/urandom | base64)" 2>&1`);
+      outStr = ssh(
+        `swaks --to ${email} --from postmaster@shopifygmc.com --server localhost:25 ` +
+        `--header 'Subject: tiny-after-overflow-${stamp}' --body 'should bounce' 2>&1 ` +
+        `| grep -E '^(\\*\\*\\*| -> |<- |<\\*\\* )'`
+      );
     } catch (e) {
       outStr = (e.stdout || '') + (e.stderr || '') + (e.message || '');
-      bounced = true;
     }
-    // Either swaks exited non-zero, or its log shows a 5xx response — both
-    // satisfy "Postfix rejected the over-quota delivery".
-    const sawDSN = /552[\s\S]*Mailbox is full|552[\s\S]*Quota exceeded|552-5\.2\.2/i.test(outStr);
-    assert(bounced || sawDSN, `expected 552 bounce, got: ${outStr.slice(-400)}`);
+    const sawDSN = /552[\s\S]*Mailbox is full|552[\s\S]*Quota exceeded|552 5\.2\.2/i.test(outStr);
+    assert(sawDSN, `expected 552 bounce in SMTP transcript, got:\n${outStr.slice(-600)}`);
   });
 
-  step('6. usage stays under quota cap (over-quota delivery did not land)', () => {
+  step('6. mailbox usage reflects over-quota state', () => {
+    // After the SMTP-time bounce in step 5, the bounced message did NOT land
+    // — so usage should equal what the prior fill deliveries put there
+    // (>2 MiB), not 2 MiB + bounce-body. Just sanity-check we're still over.
     ssh(`doveadm quota recalc -u ${email}`);
-    const out = ssh(`mailbox usage ${email}`);
-    const u = parseUsageLine(out);
-    assert(u.used < 2 * 1024 * 1024 + 100000, `usage exceeded 2M+ε: ${u.used} (delivery should have bounced)`);
+    const u = parseUsageLine(ssh(`mailbox usage ${email}`));
+    assert(u.used > u.quota, `expected usage > quota, got used=${u.used} quota=${u.quota}`);
+    assert(u.used < 5 * 1024 * 1024, `usage absurdly large (${u.used}) — bounce didn't actually bounce?`);
   });
 
   step('7. cleanup', () => {

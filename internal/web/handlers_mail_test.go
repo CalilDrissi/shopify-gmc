@@ -33,16 +33,25 @@ func TestParseSizeBytes(t *testing.T) {
 
 func TestMaildirsizeUsedBytes(t *testing.T) {
 	dir := t.TempDir()
+
+	// Real-world layout: line 1 = quota header (1 GiB), line 2 = absolute
+	// baseline from recalc (49348 bytes / 12 messages), then a few deltas.
 	p := filepath.Join(dir, "maildirsize")
-	if err := os.WriteFile(p, []byte("12345S\n+100 1\n+200 1\n-50 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte("1073741824S\n49348 12\n+100 1\n+200 1\n-50 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got := maildirsizeUsedBytes(p)
-	if got != 12595 {
-		t.Errorf("got %d, want 12595", got)
+	if got := maildirsizeUsedBytes(p); got != 49598 {
+		t.Errorf("got %d, want 49598 (49348 + 100 + 200 - 50)", got)
 	}
 
-	// Missing file returns 0 (legitimate: never-delivered mailbox)
+	// Quota-only file (no usage lines yet) → 0.
+	pEmpty := filepath.Join(dir, "quota-only")
+	os.WriteFile(pEmpty, []byte("1073741824S\n"), 0o644)
+	if v := maildirsizeUsedBytes(pEmpty); v != 0 {
+		t.Errorf("quota-only = %d, want 0", v)
+	}
+
+	// Missing file returns 0 (legitimate: never-delivered mailbox).
 	if v := maildirsizeUsedBytes(filepath.Join(dir, "absent")); v != 0 {
 		t.Errorf("missing file = %d, want 0", v)
 	}

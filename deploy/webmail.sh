@@ -112,8 +112,13 @@ namespace inbox {
 
 # IMAPS only, no STARTTLS plain IMAP exposed externally.
 service imap-login {
-  inet_listener imap   { port = 0 }    # disable
-  inet_listener imaps  { port = 993; ssl = yes }
+  inet_listener imap {
+    port = 0
+  }
+  inet_listener imaps {
+    port = 993
+    ssl = yes
+  }
 }
 
 # LMTP unix socket for Postfix to deliver into
@@ -141,20 +146,28 @@ passdb {
 }
 # passwd-file (not static) so Dovecot reads the per-user 8th-field extras —
 # specifically `userdb_quota_rule=*:storage=<size>` for per-mailbox quotas.
-# `default_fields` keeps the static defaults (uid/gid/home) when the line
-# omits them, which is exactly what /etc/dovecot/users looks like.
+# `override_fields` pins uid/gid to the vmail user/group regardless of what
+# each line says — historic lines have `gid=5000` literally but no group
+# with gid 5000 exists on the box (vmail's gid is OS-assigned, e.g. 986).
+# Without override_fields, mail would deliver as gid=5000 → permission bugs.
+# `default_fields` for home is a safety net for lines that omit it.
 userdb {
   driver = passwd-file
   args = username_format=%u /etc/dovecot/users
-  default_fields = uid=vmail gid=vmail home=/var/mail/vmail/%d/%n
+  default_fields = home=/var/mail/vmail/%d/%n
+  override_fields = uid=vmail gid=vmail
 }
 
 # Quota plugin — maildir backend keeps a `maildirsize` file per mailbox so
 # reads stay cheap (no `du`). Default = 1G, overridable per-mailbox via the
 # `userdb_quota_rule` extra field on the user's line.
 mail_plugins = $mail_plugins quota
-protocol imap { mail_plugins = $mail_plugins quota imap_quota }
-protocol lmtp { mail_plugins = $mail_plugins quota }
+protocol imap {
+  mail_plugins = $mail_plugins quota imap_quota
+}
+protocol lmtp {
+  mail_plugins = $mail_plugins quota
+}
 plugin {
   quota = maildir:User quota
   quota_rule  = *:storage=1G
@@ -268,18 +281,27 @@ install -d -o www-data -g www-data /var/lib/roundcube
 chown -R www-data:www-data /var/lib/roundcube
 
 # --- Postfix: wire the quota policy service into recipient restrictions ---
-# Append `check_policy_service unix:private/quota-status` only if not present.
-# We append rather than overwrite so we don't clobber any other restrictions
-# the operator has added (anti-spam, RBLs, etc.).
+# `check_policy_service` MUST come before `permit_mynetworks` — otherwise
+# permit_mynetworks short-circuits with OK for any localhost-origin mail
+# (Roundcube → submission, scripts on the box, alias forwards) and the quota
+# check never runs. With it first, the policy returns DUNNO for in-quota
+# recipients (Postfix continues to the next rule) and 552 for over-quota.
 log "wiring Postfix quota policy"
+# Strip any prior copies of the policy line out of the existing value, then
+# prepend it. Use awk for the strip — sed's `/` separator clashes with the
+# `unix:private/quota-status` socket path. Rebuilding to a known-good order
+# every run is the simplest idempotent path.
+desired_first="check_policy_service unix:private/quota-status"
 current_rcpt=$(postconf -h smtpd_recipient_restrictions 2>/dev/null || true)
-if [[ "$current_rcpt" != *"check_policy_service unix:private/quota-status"* ]]; then
-  if [ -z "$current_rcpt" ]; then
-    new_rcpt="permit_mynetworks, reject_unauth_destination, check_policy_service unix:private/quota-status"
-  else
-    new_rcpt="$current_rcpt, check_policy_service unix:private/quota-status"
-  fi
-  postconf -e "smtpd_recipient_restrictions = $new_rcpt"
+cleaned=$(printf '%s' "$current_rcpt" | awk -v drop="$desired_first" 'BEGIN{RS=","} {
+  gsub(/^[ \t]+|[ \t]+$/, "");
+  if ($0 == drop || $0 == "") next;
+  out = (out=="" ? $0 : out ", " $0);
+} END { print out }')
+if [ -z "$cleaned" ]; then
+  postconf -e "smtpd_recipient_restrictions = $desired_first, permit_mynetworks, reject_unauth_destination"
+else
+  postconf -e "smtpd_recipient_restrictions = $desired_first, $cleaned"
 fi
 
 # --- Reload + baseline existing mailboxes ---
