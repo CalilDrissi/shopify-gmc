@@ -166,7 +166,7 @@ protocol imap {
   mail_plugins = $mail_plugins quota imap_quota
 }
 protocol lmtp {
-  mail_plugins = $mail_plugins quota
+  mail_plugins = $mail_plugins quota sieve
 }
 plugin {
   quota = maildir:User quota

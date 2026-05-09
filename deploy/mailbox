@@ -74,10 +74,16 @@ quota_field_for() {
 }
 
 # Suspend tokens live alongside quota rules in the 8th field.
-# Dovecot's passwd-file parser separates multiple extra fields by whitespace;
-# `nopassword=y` tells the passdb the user has no valid password, so auth is
-# rejected while the userdb entry (and Maildir delivery) keeps working.
+# Two markers cooperate: `nopassword=y` is the human-readable signal (also
+# what the Go reader's regex matches to render the badge), and
+# `prior_hash=<original>` carries the real Argon2id hash so unsuspend can
+# restore it. The actual auth-block is field 2 (the password hash) being
+# rewritten to a sentinel that no Argon2id verifier will ever accept.
 SUSPEND_TOKEN='nopassword=y'
+# Sentinel hash for suspended accounts. `{ARGON2ID}!` parses as the ARGON2ID
+# scheme but the body `!` is invalid PHC encoding, so password::verify always
+# returns false. Any submitted password fails — auth is genuinely rejected.
+SUSPEND_HASH_SENTINEL='{ARGON2ID}!'
 
 is_suspended_line() {
   local line="$1"
@@ -278,10 +284,23 @@ cmd_suspend() {
   require_email "$email"
   local existing; existing=$(grep "^$email:" "$USERS" || true)
   [ -n "$existing" ] || { echo "no such mailbox: $email"; exit 1; }
+  if is_suspended_line "$existing"; then
+    echo "already suspended: $email"; return 0
+  fi
 
+  # Capture the original Argon2id hash so unsuspend can restore it.
+  local orig_hash; orig_hash=$(printf '%s\n' "$existing" | awk -F: '{print $2}')
   local prior_extra; prior_extra=$(printf '%s\n' "$existing" | awk -F: 'BEGIN{OFS=":"} {n=NF; out=$8; for(i=9;i<=n;i++) out=out":"$i; print out}')
-  local new_extra; new_extra=$(add_suspend_token "$prior_extra")
-  local rebuilt; rebuilt=$(write_extra_field "$email" "$new_extra" "$existing")
+
+  # Compose new extras: keep whatever was there, append prior_hash + suspend
+  # marker. Argon2 PHC encoding has no spaces, so the value is safe to embed
+  # in a space-separated extras field.
+  local new_extra="$prior_extra"
+  [ -n "$new_extra" ] && new_extra="$new_extra "
+  new_extra="${new_extra}prior_hash=${orig_hash} ${SUSPEND_TOKEN}"
+
+  # Replace field 2 (hash) with the sentinel so password::verify always fails.
+  local rebuilt; rebuilt=$(printf '%s\n' "$existing" | awk -F: -v h="$SUSPEND_HASH_SENTINEL" -v ex="$new_extra" 'BEGIN{OFS=":"} { print $1,h,$3,$4,$5,$6,$7,ex }')
 
   sed -i "\|^$email:|d" "$USERS"
   echo "$rebuilt" >> "$USERS"
@@ -294,10 +313,28 @@ cmd_unsuspend() {
   require_email "$email"
   local existing; existing=$(grep "^$email:" "$USERS" || true)
   [ -n "$existing" ] || { echo "no such mailbox: $email"; exit 1; }
+  if ! is_suspended_line "$existing"; then
+    echo "not suspended: $email"; return 0
+  fi
 
   local prior_extra; prior_extra=$(printf '%s\n' "$existing" | awk -F: 'BEGIN{OFS=":"} {n=NF; out=$8; for(i=9;i<=n;i++) out=out":"$i; print out}')
-  local new_extra; new_extra=$(strip_suspend_token "$prior_extra")
-  local rebuilt; rebuilt=$(write_extra_field "$email" "$new_extra" "$existing")
+
+  # Pull prior_hash=<value> out (value runs until next space or end).
+  local restored_hash=""
+  if [[ "$prior_extra" =~ (^|[[:space:]])prior_hash=([^[:space:]]+) ]]; then
+    restored_hash="${BASH_REMATCH[2]}"
+  fi
+  if [ -z "$restored_hash" ]; then
+    echo "no prior_hash on $email — cannot unsuspend safely. Use 'mailbox passwd' to set a fresh password." >&2
+    exit 1
+  fi
+
+  # Strip both markers + collapse whitespace.
+  local new_extra="$prior_extra"
+  new_extra=$(echo "$new_extra" | sed -E 's/(^|[[:space:]])prior_hash=[^[:space:]]+//g')
+  new_extra=$(strip_suspend_token "$new_extra")
+
+  local rebuilt; rebuilt=$(printf '%s\n' "$existing" | awk -F: -v h="$restored_hash" -v ex="$new_extra" 'BEGIN{OFS=":"} { print $1,h,$3,$4,$5,$6,$7,ex }')
 
   sed -i "\|^$email:|d" "$USERS"
   echo "$rebuilt" >> "$USERS"
