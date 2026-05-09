@@ -5,6 +5,20 @@ set -euo pipefail
 
 write_unit() {
   local env="$1" svc="$2" args="$3" desc="$4"
+  # The server unit shells out to `sudo /usr/local/bin/mailbox` (for
+  # /admin/mail), and that CLI writes to /etc/dovecot/users +
+  # /etc/postfix/virtual + Maildirs. NoNewPrivileges blocks sudo
+  # elevation; ProtectSystem=strict blocks the writes. Worker and
+  # scheduler don't shell out and stay hardened.
+  local hardening_block
+  if [ "$svc" = "server" ]; then
+    hardening_block="NoNewPrivileges=false
+ProtectSystem=false"
+  else
+    hardening_block="NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/gmcauditor/$env"
+  fi
   cat > /etc/systemd/system/gmcauditor-$env-$svc.service <<EOF
 [Unit]
 Description=$desc ($env)
@@ -26,10 +40,8 @@ KillSignal=SIGTERM
 StandardOutput=append:/var/log/gmcauditor/$env/$svc.log
 StandardError=append:/var/log/gmcauditor/$env/$svc.log
 
-# Hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ReadWritePaths=/var/log/gmcauditor/$env
+# Hardening (see write_unit for the per-svc rationale).
+$hardening_block
 ProtectHome=true
 PrivateTmp=true
 ProtectKernelTunables=true

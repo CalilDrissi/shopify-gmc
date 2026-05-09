@@ -254,13 +254,20 @@ for i in $(seq 1 12); do
   sleep 5
 done
 
-# --- Roundcube wiring: point at localhost IMAP + submission ---
+# --- Roundcube wiring: connect to Dovecot/Postfix on the FQDN ---
+# Why FQDN, not localhost: PHP's ssl:// stream wrapper enforces hostname
+# verification by default. The Dovecot cert is issued for the public
+# hostname (`mail.shopifygmc.com`), so connecting to `ssl://localhost`
+# fails handshake with "Could not connect to ssl://localhost:993:
+# Unknown reason" — the symptom users hit when their password "doesn't
+# work" in webmail. Loopback DNS still resolves the FQDN to this box,
+# so traffic stays local; only the SNI / cert match changes.
 log "configuring Roundcube"
 cat > /etc/roundcube/config.inc.php <<'EOF'
 <?php
 $config['db_dsnw'] = 'sqlite:////var/lib/roundcube/roundcube.sqlite?mode=0640';
-$config['imap_host'] = 'ssl://localhost:993';
-$config['smtp_host'] = 'tls://localhost:587';
+$config['imap_host'] = 'ssl://mail.shopifygmc.com:993';
+$config['smtp_host'] = 'tls://mail.shopifygmc.com:587';
 $config['smtp_user'] = '%u';
 $config['smtp_pass'] = '%p';
 $config['support_url'] = '';
