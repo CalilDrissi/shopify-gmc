@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -15,6 +16,34 @@ import (
 	"sync"
 	"time"
 )
+
+// logCLIFailure records the full CLI invocation + combined output so the
+// prod log captures the root cause when a sudo /usr/local/bin/mailbox call
+// returns non-zero. Without this we only ever see "exit status 1" in the
+// user-facing banner with no detail.
+func logCLIFailure(r *http.Request, op string, args []string, out string, err error) {
+	slog.ErrorContext(r.Context(), "mail_cli_failure",
+		"op", op,
+		"args", strings.Join(args, " "),
+		"err", err.Error(),
+		"output", strings.TrimSpace(out),
+	)
+}
+
+// trimErrAndOut formats the user-facing banner payload for a CLI failure.
+// Combines the Go error string ("exit status 1") with whatever stdout/stderr
+// the CLI emitted, separated by " — ", trimmed to 400 chars.
+func trimErrAndOut(err error, out string) string {
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return trimOut(err.Error())
+	}
+	// Replace internal newlines with " · " so the URL-encoded payload
+	// stays single-line and renders cleanly in the banner.
+	out = strings.ReplaceAll(out, "\r", "")
+	out = strings.ReplaceAll(out, "\n", " · ")
+	return trimOut(err.Error() + " — " + out)
+}
 
 // MailAdmin paths. The wrapper script lives at /usr/local/bin/mailbox
 // (installed by deploy/webmail.sh on the production box). On dev hosts
@@ -112,7 +141,8 @@ func (h *AdminHandlers) MailAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := runSudo(args...)
 	if err != nil {
-		mailRedirect(w, r, "error", trimOut(err.Error()+"\n"+out))
+		logCLIFailure(r, "add", args, out, err)
+		mailRedirect(w, r, "error", trimErrAndOut(err, out))
 		return
 	}
 	// CLI prints "password: <pw>" on the second line — surface it once.
@@ -120,7 +150,11 @@ func (h *AdminHandlers) MailAdd(w http.ResponseWriter, r *http.Request) {
 	mailRedirect(w, r, "added", email+"|"+pwOut)
 }
 
-// MailPasswd rotates a mailbox password.
+// MailPasswd sets a mailbox password to an admin-supplied value. The
+// admin types the new password into the row's inline field; we hand it
+// straight to the CLI's second positional arg (`mailbox passwd EMAIL PW`).
+// We do not echo the password back in the banner since the admin already
+// has it on screen.
 func (h *AdminHandlers) MailPasswd(w http.ResponseWriter, r *http.Request) {
 	d := h.adminCtx(r)
 	if d == nil {
@@ -140,13 +174,23 @@ func (h *AdminHandlers) MailPasswd(w http.ResponseWriter, r *http.Request) {
 		mailRedirect(w, r, "error", "invalid email")
 		return
 	}
-	out, err := runSudo(mailboxBinary, "passwd", email)
-	if err != nil {
-		mailRedirect(w, r, "error", trimOut(err.Error()+"\n"+out))
+	pw := r.FormValue("password")
+	if len(pw) < 8 {
+		mailRedirect(w, r, "error", "password must be at least 8 characters")
 		return
 	}
-	pwOut := extractCLIField(out, "new password:")
-	mailRedirect(w, r, "passwd", email+"|"+pwOut)
+	if len(pw) > 128 {
+		mailRedirect(w, r, "error", "password too long (max 128)")
+		return
+	}
+	args := []string{mailboxBinary, "passwd", email, pw}
+	out, err := runSudo(args...)
+	if err != nil {
+		logCLIFailure(r, "passwd", args, out, err)
+		mailRedirect(w, r, "error", trimErrAndOut(err, out))
+		return
+	}
+	mailRedirect(w, r, "passwd", email)
 }
 
 // MailDel deletes a mailbox + its Maildir. The CLI normally prompts for
@@ -180,7 +224,8 @@ func (h *AdminHandlers) MailDel(w http.ResponseWriter, r *http.Request) {
 	cmd.Stdin = strings.NewReader(email + "\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		mailRedirect(w, r, "error", trimOut(err.Error()+"\n"+string(out)))
+		logCLIFailure(r, "del", []string{mailboxBinary, "del", email}, string(out), err)
+		mailRedirect(w, r, "error", trimErrAndOut(err, string(out)))
 		return
 	}
 	mailRedirect(w, r, "deleted", email)
@@ -211,8 +256,10 @@ func (h *AdminHandlers) MailAlias(w http.ResponseWriter, r *http.Request) {
 		mailRedirect(w, r, "error", "to required")
 		return
 	}
-	if _, err := runSudo(mailboxBinary, "alias", from, to); err != nil {
-		mailRedirect(w, r, "error", trimOut(err.Error()))
+	aliasArgs := []string{mailboxBinary, "alias", from, to}
+	if out, err := runSudo(aliasArgs...); err != nil {
+		logCLIFailure(r, "alias", aliasArgs, out, err)
+		mailRedirect(w, r, "error", trimErrAndOut(err, out))
 		return
 	}
 	mailRedirect(w, r, "alias", from+"|"+to)
@@ -238,8 +285,10 @@ func (h *AdminHandlers) MailUnalias(w http.ResponseWriter, r *http.Request) {
 		mailRedirect(w, r, "error", "from must be a valid email")
 		return
 	}
-	if _, err := runSudo(mailboxBinary, "unalias", from); err != nil {
-		mailRedirect(w, r, "error", trimOut(err.Error()))
+	unaliasArgs := []string{mailboxBinary, "unalias", from}
+	if out, err := runSudo(unaliasArgs...); err != nil {
+		logCLIFailure(r, "unalias", unaliasArgs, out, err)
+		mailRedirect(w, r, "error", trimErrAndOut(err, out))
 		return
 	}
 	mailRedirect(w, r, "unalias", from)
@@ -276,8 +325,9 @@ func (h *AdminHandlers) MailQuota(w http.ResponseWriter, r *http.Request) {
 	if size != "" {
 		args = append(args, size)
 	}
-	if _, err := runSudo(args...); err != nil {
-		mailRedirect(w, r, "error", trimOut(err.Error()))
+	if out, err := runSudo(args...); err != nil {
+		logCLIFailure(r, "quota", args, out, err)
+		mailRedirect(w, r, "error", trimErrAndOut(err, out))
 		return
 	}
 	display := size
@@ -314,8 +364,10 @@ func (h *AdminHandlers) MailSuspend(w http.ResponseWriter, r *http.Request) {
 		mailRedirect(w, r, "error", "action must be suspend or unsuspend")
 		return
 	}
-	if _, err := runSudo(mailboxBinary, action, email); err != nil {
-		mailRedirect(w, r, "error", trimOut(err.Error()))
+	suspArgs := []string{mailboxBinary, action, email}
+	if out, err := runSudo(suspArgs...); err != nil {
+		logCLIFailure(r, action, suspArgs, out, err)
+		mailRedirect(w, r, "error", trimErrAndOut(err, out))
 		return
 	}
 	mailRedirect(w, r, action, email)

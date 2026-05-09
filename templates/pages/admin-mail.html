@@ -20,11 +20,7 @@
     <p><code style="font-size:1.1rem; padding:6px 10px; background:var(--md-sys-color-surface-container-highest); border-radius:6px;">{{ .Right }}</code></p>
     {{- end }}
     {{- else if eq .Kind "passwd" }}
-    <strong>Password rotated</strong> for <code>{{ .Email }}</code>.
-    {{- if .Right }}
-    <p style="margin:8px 0 0;">New password — <strong>copy now, not retrievable later</strong>:</p>
-    <p><code style="font-size:1.1rem; padding:6px 10px; background:var(--md-sys-color-surface-container-highest); border-radius:6px;">{{ .Right }}</code></p>
-    {{- end }}
+    <strong>Password updated</strong> for <code>{{ .Email }}</code>.
     {{- else if eq .Kind "deleted" }}
     Mailbox <code>{{ .Email }}</code> deleted.
     {{- else if eq .Kind "quota" }}
@@ -115,58 +111,88 @@
       <thead>
         <tr style="text-align:left; color:var(--md-sys-color-on-surface-variant);">
           <th style="padding:8px 0;">Address</th>
-          <th style="padding:8px 0; text-align:right;">Used</th>
-          <th style="padding:8px 0; text-align:right;">Quota</th>
+          <th style="padding:8px 0;">Storage</th>
           <th style="padding:8px 0;">Set quota</th>
-          <th style="padding:8px 0;">Vacation</th>
+          <th style="padding:8px 0;">Set password</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         {{- range .Mailboxes }}
-        {{- $full := ge (pctUsed .UsedBytes .QuotaBytes) 90 }}
+        {{- $pct := pctUsed .UsedBytes .QuotaBytes }}
+        {{- $sev := "ok" }}{{ if ge $pct 90 }}{{ $sev = "crit" }}{{ else if ge $pct 70 }}{{ $sev = "warn" }}{{ end }}
+        {{- $unlimited := eq .QuotaBytes 0 }}
         <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
-          <td style="padding:10px 0;">
+          <td style="padding:10px 12px 10px 0;">
             <code>{{ .Email }}</code>
             {{- if .Suspended }}
             <span style="display:inline-block; margin-left:8px; padding:2px 8px; font-size:0.75rem; font-weight:600; color:#fff; background:#b3261e; border-radius:999px; vertical-align:middle;">suspended</span>
             {{- end }}
           </td>
-          <td style="padding:10px 0; text-align:right; {{ if $full }}color:#b3261e; font-weight:600;{{ end }}">{{ humanBytes .UsedBytes }}</td>
-          <td style="padding:10px 0; text-align:right;">{{ if eq .QuotaBytes 0 }}∞{{ else }}{{ humanBytes .QuotaBytes }}{{ end }}</td>
-          <td style="padding:10px 0;">
-            <form method="post" action="/admin/mail/quota" style="margin:0; display:flex; gap:6px; align-items:center;">
+          <td style="padding:10px 12px 10px 0; min-width:200px;">
+            <div class="c-storage" data-sev="{{ $sev }}">
+              <div class="c-storage__bar" aria-hidden="true">
+                <span class="c-storage__bar-fill" style="width:{{ if $unlimited }}0{{ else }}{{ $pct }}{{ end }}%"></span>
+              </div>
+              <div class="c-storage__caption">
+                <strong>{{ humanBytes .UsedBytes }}</strong>
+                <span class="c-storage__caption-sep">/</span>
+                <span class="c-storage__caption-quota">{{ if $unlimited }}∞{{ else }}{{ humanBytes .QuotaBytes }}{{ end }}</span>
+                {{- if not $unlimited }}<span class="c-storage__caption-pct">· {{ $pct }}%</span>{{ end }}
+              </div>
+            </div>
+          </td>
+          <td style="padding:10px 12px 10px 0;">
+            <form method="post" action="/admin/mail/quota" class="c-quota-form">
               <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
               <input type="hidden" name="email" value="{{ .Email }}">
-              <input type="text" name="size" placeholder="1G / 500M / 0" pattern="[0-9]+[KMGTkmgt]?|0|" style="width:110px; padding:6px;" title="e.g. 1G, 500M, 2K — or 0 for unlimited, blank for default">
+              <div class="c-quota-form__chips" role="group" aria-label="Quota presets">
+                <button type="button" class="c-chip" data-size="500M">500M</button>
+                <button type="button" class="c-chip" data-size="1G">1G</button>
+                <button type="button" class="c-chip" data-size="2G">2G</button>
+                <button type="button" class="c-chip" data-size="5G">5G</button>
+                <button type="button" class="c-chip c-chip--inf" data-size="0" title="Unlimited">∞</button>
+              </div>
+              <div class="c-quota-form__custom">
+                <input type="text" name="size" placeholder="custom (e.g. 750M)" pattern="[0-9]+[KMGTkmgt]?|0|" autocomplete="off">
+                <button type="submit" class="c-button c-button--outlined c-button--small"><span class="c-button__label">Set</span></button>
+              </div>
+            </form>
+          </td>
+          <td style="padding:10px 0;">
+            <form method="post" action="/admin/mail/passwd" style="margin:0; display:flex; gap:6px; align-items:center;">
+              <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+              <input type="hidden" name="email" value="{{ .Email }}">
+              <input type="text" name="password" placeholder="new password" minlength="8" maxlength="128" autocomplete="new-password" required style="width:160px; padding:6px;" title="At least 8 characters">
               <button type="submit" class="c-button c-button--outlined c-button--small"><span class="c-button__label">Set</span></button>
             </form>
           </td>
-          <td style="padding:10px 0; text-align:right; display:flex; gap:8px; justify-content:flex-end; align-items:center;">
-            {{- if .Suspended }}
-            <span style="background:#b3261e; color:white; padding:2px 8px; border-radius:10px; font-size:0.75rem; margin-right:4px;">suspended</span>
-            {{- end }}
+          <td class="c-mailbox-actions" style="padding:10px 0; text-align:right;">
             <a href="/admin/mail/activity?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Recent mail.log activity for {{ .Email }}"><span class="c-button__label">Activity</span></a>
             <a href="/admin/mail/vacation?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Vacation auto-reply"><span class="c-button__label">Vacation</span>{{ if .Vacation.Enabled }} <span style="margin-left:4px; padding:1px 6px; border-radius:8px; background:#1b873f; color:#fff; font-size:0.7rem;">on</span>{{ end }}</a>
             <a href="/admin/mail/filters?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Inbox filter rules"><span class="c-button__label">Filters</span></a>
             <a href="/admin/mail/spam?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Whitelist / blacklist / threshold"><span class="c-button__label">Spam</span></a>
-            <form method="post" action="/admin/mail/suspend" style="margin:0;">
+            <form method="post" action="/admin/mail/suspend" class="js-needs-confirm" style="margin:0;"
+                  data-confirm-title="{{ if .Suspended }}Unsuspend mailbox{{ else }}Suspend mailbox{{ end }}"
+                  data-confirm-message="{{ if .Suspended }}Unsuspend {{ .Email }}? Auth will be re-enabled.{{ else }}Suspend {{ .Email }}? Auth will be rejected; mail keeps delivering.{{ end }}"
+                  data-confirm-ok="{{ if .Suspended }}Unsuspend{{ else }}Suspend{{ end }}">
               <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
               <input type="hidden" name="email" value="{{ .Email }}">
               {{- if .Suspended }}
               <input type="hidden" name="action" value="unsuspend">
-              <button type="submit" class="c-button c-button--outlined c-button--small" onclick="return confirm('Unsuspend {{ .Email }}?')"><span class="c-button__label">Unsuspend</span></button>
+              <button type="submit" class="c-button c-button--outlined c-button--small"><span class="c-button__label">Unsuspend</span></button>
               {{- else }}
               <input type="hidden" name="action" value="suspend">
-              <button type="submit" class="c-button c-button--outlined c-button--small" onclick="return confirm('Suspend {{ .Email }}? Auth will be rejected; mail keeps delivering.')"><span class="c-button__label">Suspend</span></button>
+              <button type="submit" class="c-button c-button--outlined c-button--small"><span class="c-button__label">Suspend</span></button>
               {{- end }}
             </form>
-            <form method="post" action="/admin/mail/passwd" style="margin:0;">
-              <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
-              <input type="hidden" name="email" value="{{ .Email }}">
-              <button type="submit" class="c-button c-button--outlined c-button--small" onclick="return confirm('Rotate password for {{ .Email }}?')"><span class="c-button__label">Rotate password</span></button>
-            </form>
-            <form method="post" action="/admin/mail/del" style="margin:0;" onsubmit="this.confirm.value = prompt('Type {{ .Email }} to confirm deletion:'); return this.confirm.value !== null;">
+            <form method="post" action="/admin/mail/del" class="js-needs-confirm" style="margin:0;"
+                  data-confirm-title="Delete mailbox"
+                  data-confirm-message="Permanently delete {{ .Email }} and its mail. This cannot be undone."
+                  data-confirm-typeword="{{ .Email }}"
+                  data-confirm-typelabel="Type the full email to confirm:"
+                  data-confirm-ok="Delete"
+                  data-confirm-target="confirm">
               <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
               <input type="hidden" name="email" value="{{ .Email }}">
               <input type="hidden" name="confirm" value="">
@@ -201,10 +227,13 @@
           <td style="padding:10px 0;"><code>{{ .From }}</code></td>
           <td style="padding:10px 0;"><code>{{ .To }}</code></td>
           <td style="padding:10px 0; text-align:right;">
-            <form method="post" action="/admin/mail/unalias" style="margin:0;">
+            <form method="post" action="/admin/mail/unalias" class="js-needs-confirm" style="margin:0;"
+                  data-confirm-title="Remove alias"
+                  data-confirm-message="Remove alias {{ .From }} → {{ .To }}?"
+                  data-confirm-ok="Remove">
               <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
               <input type="hidden" name="from" value="{{ .From }}">
-              <button type="submit" class="c-button c-button--outlined c-button--small" onclick="return confirm('Remove alias {{ .From }} → {{ .To }}?')"><span class="c-button__label">Remove</span></button>
+              <button type="submit" class="c-button c-button--outlined c-button--small"><span class="c-button__label">Remove</span></button>
             </form>
           </td>
         </tr>
@@ -216,6 +245,152 @@
     {{- end }}
   </div>
 </article>
+
+<dialog id="confirm-dialog" class="c-confirm-dialog">
+  <form method="dialog" class="c-confirm-dialog__form" id="confirm-form">
+    <h2 class="c-confirm-dialog__title" id="confirm-title">Confirm</h2>
+    <p class="c-confirm-dialog__message" id="confirm-message"></p>
+    <label class="c-confirm-dialog__type-wrap" id="confirm-type-wrap" hidden>
+      <span class="c-confirm-dialog__type-label" id="confirm-type-label"></span>
+      <input type="text" id="confirm-type-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </label>
+    <div class="c-confirm-dialog__actions">
+      <button type="button" class="c-button c-button--text" id="confirm-cancel"><span class="c-button__label">Cancel</span></button>
+      <button type="button" class="c-button c-button--filled" id="confirm-ok"><span class="c-button__label">Confirm</span></button>
+    </div>
+  </form>
+</dialog>
+
+<style>
+/* Storage bar — combined used/quota visualization. */
+.c-storage { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
+.c-storage__bar { width: 100%; height: 6px; background: var(--md-sys-color-surface-container-highest); border-radius: 999px; overflow: hidden; }
+.c-storage__bar-fill { display: block; height: 100%; border-radius: 999px; transition: width 200ms ease; }
+.c-storage[data-sev="ok"]   .c-storage__bar-fill { background: var(--md-sys-color-primary); }
+.c-storage[data-sev="warn"] .c-storage__bar-fill { background: var(--md-sys-color-warning); }
+.c-storage[data-sev="crit"] .c-storage__bar-fill { background: var(--md-sys-color-error); }
+.c-storage__caption { font-size: 0.8125rem; color: var(--md-sys-color-on-surface-variant); display: flex; gap: 4px; align-items: baseline; flex-wrap: wrap; }
+.c-storage__caption strong { color: var(--md-sys-color-on-surface); font-weight: 600; }
+.c-storage[data-sev="warn"] .c-storage__caption strong { color: var(--md-sys-color-warning); }
+.c-storage[data-sev="crit"] .c-storage__caption strong { color: var(--md-sys-color-error); }
+.c-storage__caption-sep   { opacity: 0.5; }
+.c-storage__caption-quota { color: var(--md-sys-color-on-surface-variant); }
+.c-storage__caption-pct   { margin-left: auto; }
+
+/* Set-quota form — preset chips + custom input. */
+.c-quota-form { display: flex; flex-direction: column; gap: 6px; min-width: 220px; }
+.c-quota-form__chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.c-quota-form__custom { display: flex; gap: 6px; align-items: center; }
+.c-quota-form__custom input { flex: 1; padding: 6px 8px; border: 1px solid var(--md-sys-color-outline); border-radius: 8px; background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); font: inherit; min-width: 0; }
+.c-quota-form__custom input:focus { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; border-color: var(--md-sys-color-primary); }
+.c-chip { padding: 4px 12px; min-height: 28px; border-radius: 999px; border: 1px solid var(--md-sys-color-outline); background: transparent; color: var(--md-sys-color-on-surface-variant); font: inherit; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease; }
+.c-chip:hover { background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); }
+.c-chip:active { background: var(--md-sys-color-surface-container-highest); }
+.c-chip:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px; }
+.c-chip--inf { font-size: 1rem; line-height: 1; padding-bottom: 5px; }
+
+/* Mailbox row action cell — wraps to second line when narrow. */
+.c-mailbox-actions { white-space: normal; }
+.c-mailbox-actions > * { display: inline-flex; vertical-align: middle; margin: 2px 0 2px 4px; }
+.c-mailbox-actions form { display: inline-flex; }
+
+.c-confirm-dialog { border: 0; padding: 0; border-radius: 28px; background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); max-width: 480px; width: calc(100% - 32px); box-shadow: 0 24px 38px 3px rgba(0,0,0,0.14), 0 9px 46px 8px rgba(0,0,0,0.12), 0 11px 15px -7px rgba(0,0,0,0.20); }
+.c-confirm-dialog::backdrop { background: rgba(0,0,0,0.32); backdrop-filter: blur(2px); }
+.c-confirm-dialog__form { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.c-confirm-dialog__title { margin: 0; font-size: 1.5rem; font-weight: 500; color: var(--md-sys-color-on-surface); }
+.c-confirm-dialog__message { margin: 0; color: var(--md-sys-color-on-surface-variant); }
+.c-confirm-dialog__type-wrap { display: flex; flex-direction: column; gap: 6px; }
+.c-confirm-dialog__type-label { font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); }
+#confirm-type-input { width: 100%; padding: 10px 12px; border: 1px solid var(--md-sys-color-outline); border-radius: 8px; background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); font: inherit; }
+#confirm-type-input:focus { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; border-color: var(--md-sys-color-primary); }
+.c-confirm-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+</style>
+
+<script>
+// Quota preset chips: clicking fills the form's size input and submits.
+document.querySelectorAll('.c-quota-form .c-chip').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var form = btn.closest('form');
+    if (!form) return;
+    var input = form.querySelector('input[name="size"]');
+    if (input) input.value = btn.dataset.size || '';
+    form.submit();
+  });
+});
+
+(function () {
+  var dlg = document.getElementById('confirm-dialog');
+  if (!dlg || typeof dlg.showModal !== 'function') return;
+  var titleEl = document.getElementById('confirm-title');
+  var msgEl   = document.getElementById('confirm-message');
+  var wrap    = document.getElementById('confirm-type-wrap');
+  var lblEl   = document.getElementById('confirm-type-label');
+  var input   = document.getElementById('confirm-type-input');
+  var okBtn   = document.getElementById('confirm-ok');
+  var cancelBtn = document.getElementById('confirm-cancel');
+  var pending = null;
+  var typeword = '';
+  var targetField = '';
+
+  function reset() {
+    pending = null;
+    typeword = '';
+    targetField = '';
+    input.value = '';
+    wrap.hidden = true;
+    okBtn.disabled = false;
+  }
+
+  document.querySelectorAll('form.js-needs-confirm').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      if (form.dataset.confirmed === '1') { return; }
+      e.preventDefault();
+      pending = form;
+      titleEl.textContent = form.dataset.confirmTitle || 'Confirm';
+      msgEl.textContent   = form.dataset.confirmMessage || 'Are you sure?';
+      okBtn.querySelector('.c-button__label').textContent = form.dataset.confirmOk || 'Confirm';
+      typeword = form.dataset.confirmTypeword || '';
+      targetField = form.dataset.confirmTarget || '';
+      if (typeword) {
+        wrap.hidden = false;
+        lblEl.textContent = form.dataset.confirmTypelabel || ('Type ' + typeword + ' to confirm:');
+        input.value = '';
+        okBtn.disabled = true;
+      } else {
+        wrap.hidden = true;
+        okBtn.disabled = false;
+      }
+      dlg.showModal();
+      if (typeword) { setTimeout(function(){ input.focus(); }, 0); }
+    });
+  });
+
+  input.addEventListener('input', function () {
+    okBtn.disabled = (input.value !== typeword);
+  });
+
+  cancelBtn.addEventListener('click', function () {
+    dlg.close('cancel');
+  });
+
+  okBtn.addEventListener('click', function () {
+    if (!pending) { dlg.close('cancel'); return; }
+    if (typeword && input.value !== typeword) { return; }
+    var form = pending;
+    if (typeword && targetField) {
+      var hidden = form.querySelector('input[name="' + targetField + '"]');
+      if (hidden) { hidden.value = input.value; }
+    }
+    form.dataset.confirmed = '1';
+    dlg.close('ok');
+    form.submit();
+  });
+
+  dlg.addEventListener('close', function () {
+    if (dlg.returnValue !== 'ok') { reset(); }
+  });
+})();
+</script>
 
 {{ end }}
 {{ end }}
