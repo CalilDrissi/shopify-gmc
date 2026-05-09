@@ -58,14 +58,19 @@ To delete an alias, scroll to the **Aliases** table and click
 Mailbox owners (anyone with an `@shopifygmc.com` address) can rotate
 their own password without bothering the admin:
 
-1. <https://mail.shopifygmc.com> → log in.
-2. **Settings** (gear icon, top-right) → **Password**.
-3. Type current password, then a new one twice. Minimum 12 chars.
-4. Save. The change is live immediately — your *next* IMAP
-   connection uses the new password.
+1. <https://mail.shopifygmc.com> → log in with your full address +
+   current password.
+2. Click the **gear icon** (top-right) — opens **Settings**.
+3. In the left sidebar pick **Password**.
+4. Type the new password twice. Minimum 12 chars.
+   (Roundcube uses your current session's IMAP password as the
+   "current" — the form only asks for the new one.)
+5. Click **Save**. You'll see a green "Successfully saved." banner.
+6. The new password is live immediately — your next IMAP login uses it.
 
-Behind the scenes Roundcube calls the same `mailbox passwd` command
-the UI does, just scoped to the logged-in user.
+Behind the scenes Roundcube uses the `dovecot_passwdfile` driver to
+rewrite the same `/etc/dovecot/users` file the `mailbox` CLI manages,
+hashed as `hash-argon2id` with the `{ARGON2ID}` prefix Dovecot reads.
 
 ## Scriptable / batch ops — `mailbox` CLI
 
