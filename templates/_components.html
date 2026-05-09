@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Components — gmcauditor</title>
+  <link rel="preload" href="/static/fonts/Inter-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/Inter-Medium.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/Inter-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/css/main.css">
   <style>
     /* Page chrome only — not part of the design system */
@@ -18,11 +21,66 @@
     .stack { display: flex; flex-direction: column; gap: 16px; }
     .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
     .form-stack { display: flex; flex-direction: column; gap: 16px; max-width: 420px; }
+    .swatch { width: 160px; height: 96px; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: flex-end; font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 500; }
+    .swatch small { display: block; font-weight: 400; opacity: 0.85; font-feature-settings: 'tnum'; }
+    .type-stack { display: flex; flex-direction: column; gap: 12px; }
+    .type-row { display: grid; grid-template-columns: 180px 1fr; align-items: baseline; gap: 24px; padding: 8px 0; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+    .type-label { font-size: 0.75rem; font-family: 'Inter', monospace; color: var(--md-sys-color-on-surface-variant); }
+    .type-sample { color: var(--md-sys-color-on-surface); }
   </style>
 </head>
 <body>
   <h1>gmcauditor components</h1>
-  <p class="page-subtitle">Material Design 3 tokens, BEM partials, no JavaScript.</p>
+  <p class="page-subtitle">Material Design 3 tokens (source #008060 — Shopify green), BEM partials, no JavaScript.</p>
+
+  <section>
+    <h2>Color palette</h2>
+    <h3>Primary</h3>
+    <div class="grid">
+      <div class="swatch" style="background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary)">primary<br><small>#006d52</small></div>
+      <div class="swatch" style="background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)">primary-container<br><small>#9af5cd</small></div>
+      <div class="swatch" style="background:var(--md-sys-color-primary-fixed);color:var(--md-sys-color-on-primary-fixed)">primary-fixed<br><small>#9af5cd</small></div>
+      <div class="swatch" style="background:var(--md-sys-color-primary-fixed-dim);color:var(--md-sys-color-on-primary-fixed-variant)">primary-fixed-dim<br><small>#7ed8b2</small></div>
+    </div>
+    <h3>Secondary &amp; Tertiary</h3>
+    <div class="grid">
+      <div class="swatch" style="background:var(--md-sys-color-secondary);color:var(--md-sys-color-on-secondary)">secondary</div>
+      <div class="swatch" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)">secondary-container</div>
+      <div class="swatch" style="background:var(--md-sys-color-tertiary);color:var(--md-sys-color-on-tertiary)">tertiary</div>
+      <div class="swatch" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">tertiary-container</div>
+    </div>
+    <h3>Severity</h3>
+    <div class="grid">
+      <div class="swatch" style="background:var(--md-sys-color-error);color:var(--md-sys-color-on-error)">error</div>
+      <div class="swatch" style="background:var(--md-sys-color-error-container);color:var(--md-sys-color-on-error-container)">error-container</div>
+      <div class="swatch" style="background:var(--md-sys-color-warning);color:var(--md-sys-color-on-warning)">warning</div>
+      <div class="swatch" style="background:var(--md-sys-color-warning-container);color:var(--md-sys-color-on-warning-container)">warning-container</div>
+    </div>
+    <h3>Surface</h3>
+    <div class="grid">
+      <div class="swatch" style="background:var(--md-sys-color-surface);color:var(--md-sys-color-on-surface);border:1px solid var(--md-sys-color-outline-variant)">surface</div>
+      <div class="swatch" style="background:var(--md-sys-color-surface-container-low);color:var(--md-sys-color-on-surface)">container-low</div>
+      <div class="swatch" style="background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface)">container</div>
+      <div class="swatch" style="background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface)">container-high</div>
+      <div class="swatch" style="background:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface)">container-highest</div>
+      <div class="swatch" style="background:var(--md-sys-color-surface-dim);color:var(--md-sys-color-on-surface)">surface-dim</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Typography scale</h2>
+    <div class="type-stack">
+      <div class="type-row"><span class="type-label">display-large</span><span class="type-sample" style="font:var(--md-sys-typescale-display-large-weight) var(--md-sys-typescale-display-large-size)/var(--md-sys-typescale-display-large-line-height) Inter,sans-serif;letter-spacing:var(--md-sys-typescale-display-large-tracking)">Audit, fix, ship</span></div>
+      <div class="type-row"><span class="type-label">display-medium</span><span class="type-sample" style="font:var(--md-sys-typescale-display-medium-weight) var(--md-sys-typescale-display-medium-size)/var(--md-sys-typescale-display-medium-line-height) Inter,sans-serif">Audit, fix, ship</span></div>
+      <div class="type-row"><span class="type-label">headline-large</span><span class="type-sample" style="font:var(--md-sys-typescale-headline-large-weight) var(--md-sys-typescale-headline-large-size)/var(--md-sys-typescale-headline-large-line-height) Inter,sans-serif">GMC compliance, automated</span></div>
+      <div class="type-row"><span class="type-label">headline-medium</span><span class="type-sample" style="font:var(--md-sys-typescale-headline-medium-weight) var(--md-sys-typescale-headline-medium-size)/var(--md-sys-typescale-headline-medium-line-height) Inter,sans-serif">GMC compliance, automated</span></div>
+      <div class="type-row"><span class="type-label">title-large</span><span class="type-sample" style="font:var(--md-sys-typescale-title-large-weight) var(--md-sys-typescale-title-large-size)/var(--md-sys-typescale-title-large-line-height) Inter,sans-serif">Section title</span></div>
+      <div class="type-row"><span class="type-label">title-medium</span><span class="type-sample" style="font:var(--md-sys-typescale-title-medium-weight) var(--md-sys-typescale-title-medium-size)/var(--md-sys-typescale-title-medium-line-height) Inter,sans-serif;letter-spacing:var(--md-sys-typescale-title-medium-tracking)">Card title</span></div>
+      <div class="type-row"><span class="type-label">body-large</span><span class="type-sample" style="font:var(--md-sys-typescale-body-large-weight) var(--md-sys-typescale-body-large-size)/var(--md-sys-typescale-body-large-line-height) Inter,sans-serif;letter-spacing:var(--md-sys-typescale-body-large-tracking)">The quick brown fox jumps over the lazy dog 0123456789</span></div>
+      <div class="type-row"><span class="type-label">body-medium</span><span class="type-sample" style="font:var(--md-sys-typescale-body-medium-weight) var(--md-sys-typescale-body-medium-size)/var(--md-sys-typescale-body-medium-line-height) Inter,sans-serif;letter-spacing:var(--md-sys-typescale-body-medium-tracking)">The quick brown fox jumps over the lazy dog 0123456789</span></div>
+      <div class="type-row"><span class="type-label">label-large</span><span class="type-sample" style="font:var(--md-sys-typescale-label-large-weight) var(--md-sys-typescale-label-large-size)/var(--md-sys-typescale-label-large-line-height) Inter,sans-serif;letter-spacing:var(--md-sys-typescale-label-large-tracking);text-transform:uppercase">BUTTON LABEL</span></div>
+    </div>
+  </section>
 
   <section>
     <h2>Button</h2>
@@ -72,7 +130,59 @@
 
   <section>
     <h2>Pill</h2>
+    <h3>From handler</h3>
     <div class="grid">{{ range .Pills }}{{ template "pill" . }}{{ end }}</div>
+    <h3>Severity scale (info / warning / critical / success)</h3>
+    <div class="grid">
+      <span class="c-pill c-pill--info">info</span>
+      <span class="c-pill c-pill--success">success</span>
+      <span class="c-pill c-pill--warning">warning</span>
+      <span class="c-pill c-pill--critical">critical</span>
+      <span class="c-pill c-pill--filled">neutral</span>
+      <span class="c-pill c-pill--outlined">outlined</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Floating-label form-field</h2>
+    <p style="color:var(--md-sys-color-on-surface-variant);font-size:0.875rem">M3-spec outlined text field — label sits inside at rest, animates above the border on focus or fill. Pure CSS.</p>
+    <div class="form-stack">
+      <div class="c-form-field c-form-field--floating">
+        <input id="ff-floating-1" class="c-input c-form-field__floating-input" type="text" placeholder=" " value="Acme Electronics">
+        <label for="ff-floating-1" class="c-form-field__floating-label">Workspace name</label>
+      </div>
+      <div class="c-form-field c-form-field--floating">
+        <input id="ff-floating-2" class="c-input c-form-field__floating-input" type="email" placeholder=" ">
+        <label for="ff-floating-2" class="c-form-field__floating-label">Email address</label>
+      </div>
+      <div class="c-form-field c-form-field--floating c-form-field--invalid">
+        <input id="ff-floating-3" class="c-input c-form-field__floating-input" type="url" placeholder=" " value="ftp://broken" aria-invalid="true">
+        <label for="ff-floating-3" class="c-form-field__floating-label">Webhook URL</label>
+        <p class="c-form-field__error">Must be a valid https:// URL.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Table</h2>
+    <p style="color:var(--md-sys-color-on-surface-variant);font-size:0.875rem">Header row sits on surface-container; body rows on surface; numeric cells render with tabular figures (digits stack into a column).</p>
+    <table class="c-table">
+      <thead class="c-table__head">
+        <tr>
+          <th class="c-table__header">Store</th>
+          <th class="c-table__header">Plan</th>
+          <th class="c-table__header c-table__header--num">Products</th>
+          <th class="c-table__header c-table__header--num">Issues</th>
+          <th class="c-table__header">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="c-table__cell">acme-electronics.myshopify.com</td><td class="c-table__cell">Pro</td><td class="c-table__cell c-table__cell--num">1,284</td><td class="c-table__cell c-table__cell--num">3</td><td class="c-table__cell"><span class="c-pill c-pill--warning">3 critical</span></td></tr>
+        <tr><td class="c-table__cell">vivid-coffee.myshopify.com</td><td class="c-table__cell">Starter</td><td class="c-table__cell c-table__cell--num">142</td><td class="c-table__cell c-table__cell--num">0</td><td class="c-table__cell"><span class="c-pill c-pill--success">All passing</span></td></tr>
+        <tr><td class="c-table__cell">north-trail.myshopify.com</td><td class="c-table__cell">Agency</td><td class="c-table__cell c-table__cell--num">8,420</td><td class="c-table__cell c-table__cell--num">17</td><td class="c-table__cell"><span class="c-pill c-pill--critical">17 critical</span></td></tr>
+        <tr><td class="c-table__cell">tide-and-pine.myshopify.com</td><td class="c-table__cell">Growth</td><td class="c-table__cell c-table__cell--num">512</td><td class="c-table__cell c-table__cell--num">2</td><td class="c-table__cell"><span class="c-pill c-pill--info">2 warnings</span></td></tr>
+      </tbody>
+    </table>
   </section>
 </body>
 </html>{{ end }}

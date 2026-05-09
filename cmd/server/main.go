@@ -584,8 +584,20 @@ func componentsDemo(w http.ResponseWriter, r *http.Request) {
 			return in
 		},
 	}
-	partials, _ := filepath.Glob("templates/partials/*.html")
-	files := append([]string{"templates/_components.html"}, partials...)
+	// Only load the partials we actually use — globbing all of them pulls
+	// in audit-progress.html etc. which reference funcs (deref/toFloat)
+	// that aren't in this handler's funcMap.
+	files := []string{
+		"templates/_components.html",
+		"templates/partials/button.html",
+		"templates/partials/card.html",
+		"templates/partials/banner.html",
+		"templates/partials/badge.html",
+		"templates/partials/pill.html",
+		"templates/partials/form-field.html",
+		"templates/partials/input.html",
+		"templates/partials/label.html",
+	}
 	page := template.Must(template.New("").Funcs(funcMap).ParseFiles(files...))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := page.ExecuteTemplate(w, "components", componentsData()); err != nil {

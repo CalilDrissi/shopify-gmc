@@ -39,7 +39,17 @@
   box-shadow:       var(--md-sys-elevation-#{$level});
 }
 
-@mixin state-layer($color: var(--md-sys-color-on-surface)) {
+// state-layer paints an M3 state overlay over the host element, switching
+// opacity on :hover/:focus-visible/:active. The base color defaults to
+// the on-surface role (works on most backgrounds); pass `primary` etc.
+// for buttons whose hover should pick up the brand color. The optional
+// `$base-opacity` arg lets callers pre-apply a tint at rest (M3's
+// "elevated" buttons sit at 0% rest but other components — e.g. the
+// dragged surface — can dial in the dragged state directly).
+@mixin state-layer(
+  $color: var(--md-sys-color-on-surface),
+  $base-opacity: 0
+) {
   position: relative;
   isolation: isolate;
 
@@ -48,7 +58,7 @@
     position: absolute;
     inset: 0;
     background-color: $color;
-    opacity: 0;
+    opacity: $base-opacity;
     pointer-events: none;
     border-radius: inherit;
     transition: opacity 120ms ease;

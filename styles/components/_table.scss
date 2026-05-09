@@ -1,0 +1,65 @@
+@use '../abstracts' as a;
+
+// M3-flavoured data table. Header row sits on surface-container; body
+// rows on surface with outline-variant separators. Hover lifts a row
+// to surface-container-low. Numeric cells render with tabular figures
+// so columns of digits align cleanly.
+.c-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  border-radius: var(--md-sys-shape-medium);
+  overflow: hidden;
+
+  &__head {
+    background-color: var(--md-sys-color-surface-container);
+  }
+
+  &__header,
+  th {
+    @include a.style(title-small);
+    color: var(--md-sys-color-on-surface-variant);
+    text-align: left;
+    padding: a.$space-3 a.$space-4;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    font-weight: 500;
+  }
+
+  &__row {
+    transition: background-color 120ms ease;
+  }
+
+  tbody tr {
+    transition: background-color 120ms ease;
+  }
+
+  tbody tr:hover {
+    background-color: var(--md-sys-color-surface-container-low);
+  }
+
+  &__cell,
+  td {
+    @include a.style(body-medium);
+    padding: a.$space-3 a.$space-4;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    color: var(--md-sys-color-on-surface);
+    vertical-align: middle;
+  }
+
+  // Last row drops its bottom border so the rounded corner reads cleanly.
+  tbody tr:last-child td,
+  tbody tr:last-child .c-table__cell {
+    border-bottom: 0;
+  }
+
+  // Right-align numeric columns and render with tabular figures so
+  // digits stack into a clean column.
+  &__cell--num,
+  td.c-table__cell--num,
+  th.c-table__header--num {
+    text-align: right;
+    @include a.tabular-numbers;
+  }
+}

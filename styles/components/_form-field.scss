@@ -1,5 +1,6 @@
 @use '../abstracts' as a;
 
+// Standard form-field: top label → input → helper/error.
 .c-form-field {
   display: flex;
   flex-direction: column;
@@ -19,15 +20,67 @@
     @include a.style(body-small);
     color: var(--md-sys-color-on-surface-variant);
     margin-top: a.$space-1;
+    padding-left: a.$space-4;
   }
 
   &__error {
     @include a.style(body-small);
     color: var(--md-sys-color-error);
     margin-top: a.$space-1;
+    padding-left: a.$space-4;
   }
 
   &--invalid {
     .c-form-field__label { color: var(--md-sys-color-error); }
+  }
+
+  // Floating-label variant — M3-spec outlined text field. The label sits
+  // inside the input at rest (body-large) and animates to a body-small
+  // notch above the top border on focus or when the input has content.
+  // Pure CSS via :focus + :placeholder-shown — no JS needed.
+  //
+  // Markup pattern:
+  //   <div class="c-form-field c-form-field--floating">
+  //     <input class="c-input c-form-field__floating-input" placeholder=" ">
+  //     <label class="c-form-field__floating-label">Label</label>
+  //   </div>
+  &--floating {
+    position: relative;
+    gap: 0;
+
+    .c-form-field__floating-label {
+      position: absolute;
+      left: a.$space-4;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 0 a.$space-1;
+      color: var(--md-sys-color-on-surface-variant);
+      background-color: var(--md-sys-color-surface);
+      pointer-events: none;
+      transition: top 120ms ease, transform 120ms ease, color 120ms ease,
+                  font-size 120ms ease, line-height 120ms ease;
+      @include a.style(body-large);
+    }
+
+    // Floats up when the input has content or is focused. We rely on
+    // `placeholder=" "` being on the input so :placeholder-shown is true
+    // only when empty.
+    .c-form-field__floating-input:focus ~ .c-form-field__floating-label,
+    .c-form-field__floating-input:not(:placeholder-shown) ~ .c-form-field__floating-label {
+      top: 0;
+      transform: translateY(-50%);
+      @include a.style(body-small);
+      color: var(--md-sys-color-primary);
+    }
+
+    // When floating + focused, color follows the focus state; when
+    // floating but not focused, sit at on-surface-variant.
+    .c-form-field__floating-input:not(:focus):not(:placeholder-shown) ~ .c-form-field__floating-label {
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    &.c-form-field--invalid .c-form-field__floating-input ~ .c-form-field__floating-label {
+      color: var(--md-sys-color-error);
+    }
   }
 }

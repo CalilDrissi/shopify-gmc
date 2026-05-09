@@ -1,16 +1,19 @@
 @use '../abstracts' as a;
 
+// M3 outlined text field. 56px height + 4px corners + 1px outline-variant
+// border. Focus thickens the border to 2px primary (no separate outline
+// stack — that doubles up visually and looks sloppy on small inputs).
 .c-input {
   display: block;
   width: 100%;
-  min-height: 48px;
-  padding: a.$space-3 a.$space-4;
+  min-height: 56px;
+  padding: a.$space-4 a.$space-4;
   border-radius: var(--md-sys-shape-extra-small);
-  border: 1px solid var(--md-sys-color-outline);
-  background-color: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background-color: transparent;
   color: var(--md-sys-color-on-surface);
   font-family: var(--md-sys-typescale-plain-font);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: border-color 120ms ease, border-width 120ms ease;
 
   @include a.style(body-large);
 
@@ -18,15 +21,18 @@
     color: var(--md-sys-color-on-surface-variant);
   }
 
-  &:hover:not(:disabled):not(:focus) {
+  &:hover:not(:disabled):not(:focus):not(:focus-visible) {
     border-color: var(--md-sys-color-on-surface);
   }
 
+  // Focus: 2px primary border replaces the 1px resting border. Padding
+  // is reduced by 1px on each affected side so the box height doesn't
+  // jump when the border thickens.
   &:focus,
   &:focus-visible {
-    outline: 2px solid var(--md-sys-color-primary);
-    outline-offset: 0;
-    border-color: var(--md-sys-color-primary);
+    outline: none;
+    border: 2px solid var(--md-sys-color-primary);
+    padding: calc(#{a.$space-4} - 1px) calc(#{a.$space-4} - 1px);
   }
 
   &:disabled,
@@ -46,12 +52,18 @@
 
     &:focus,
     &:focus-visible {
-      outline-color: var(--md-sys-color-error);
       border-color: var(--md-sys-color-error);
     }
   }
 
   &[type='number'] {
-    font-variant-numeric: tabular-nums;
+    @include a.tabular-numbers;
   }
+}
+
+// Textarea variant — same outline treatment, taller, no fixed height.
+.c-textarea {
+  @extend .c-input;
+  min-height: 96px;
+  resize: vertical;
 }

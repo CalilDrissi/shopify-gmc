@@ -1,5 +1,30 @@
 @use 'sass:map';
 
+// Self-hosted Inter — preload the three weights we use (regular/medium/
+// semibold) from /static/fonts. font-display:swap so a missing font
+// doesn't block first paint.
+@font-face {
+  font-family: 'Inter';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/static/fonts/Inter-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('/static/fonts/Inter-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('/static/fonts/Inter-SemiBold.woff2') format('woff2');
+}
+
 $plain-font: ('Inter', 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
 $brand-font: ('Inter', 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
 
@@ -31,6 +56,20 @@ $scale: (
   line-height:    map.get($config, line);
   font-weight:    map.get($config, weight);
   letter-spacing: map.get($config, tracking);
+}
+
+// `apply-typography` is the canonical M3-spec name; `style` stays as a
+// shorter alias for the existing call sites.
+@mixin apply-typography($name) {
+  @include style($name);
+}
+
+// Tabular numbers — for tables / metrics where digits need to align.
+// `tnum` is the OpenType feature; `lnum` forces lining (vs old-style)
+// figures so heights line up too.
+@mixin tabular-numbers {
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 @mixin emit-vars {
