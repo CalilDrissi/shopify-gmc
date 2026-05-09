@@ -45,7 +45,11 @@
 </article>
 {{- end }}
 
-<section style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px;">
+<div style="margin-top:24px; display:flex; justify-content:flex-end;">
+  <a href="/admin/mail/import" class="c-button c-button--outlined"{{ if not .Configured }} aria-disabled="true" tabindex="-1" style="pointer-events:none; opacity:0.5;"{{ end }}><span class="c-button__label">Bulk import (CSV)</span></a>
+</div>
+
+<section style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
   <article class="c-card c-card--outlined">
     <div class="c-card__header"><h2 class="c-card__title">Add mailbox</h2></div>
     <div class="c-card__body">

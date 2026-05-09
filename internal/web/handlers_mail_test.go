@@ -3,6 +3,7 @@ package web
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -107,5 +108,178 @@ func TestQuotaRuleRE(t *testing.T) {
 	}
 	if got := quotaRuleRE.FindStringSubmatch("no quota here"); got != nil {
 		t.Errorf("got %v, want nil", got)
+	}
+}
+
+func TestParseImportCSV_ValidFiveRows(t *testing.T) {
+	in := strings.NewReader("email,password,quota\n" +
+		"a@example.com,,1G\n" +
+		"b@example.com,SuppliedPW1,500M\n" +
+		"c@example.com,,\n" +
+		"d@example.com,,0\n" +
+		"e@example.com,SuppliedPW2,2G\n")
+	rows, err := parseImportCSV(in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rows) != 5 {
+		t.Fatalf("want 5 rows, got %d", len(rows))
+	}
+	for i, r := range rows {
+		if r.Err != "" {
+			t.Errorf("row %d: unexpected validation error %q", i, r.Err)
+		}
+	}
+	if rows[0].Email != "a@example.com" || rows[0].Quota != "1G" {
+		t.Errorf("row 0: got %+v", rows[0])
+	}
+	if rows[1].Password != "SuppliedPW1" {
+		t.Errorf("row 1 password not preserved: got %q", rows[1].Password)
+	}
+	if rows[2].Quota != "" {
+		t.Errorf("row 2 quota should be empty, got %q", rows[2].Quota)
+	}
+	if rows[3].Quota != "0" {
+		t.Errorf("row 3 quota should be 0, got %q", rows[3].Quota)
+	}
+	// LineNo: header is line 1, first data row is line 2.
+	if rows[0].LineNo != 2 || rows[4].LineNo != 6 {
+		t.Errorf("LineNo wrong: %d / %d", rows[0].LineNo, rows[4].LineNo)
+	}
+}
+
+func TestParseImportCSV_BlankLinesSkipped(t *testing.T) {
+	in := strings.NewReader("email,password,quota\n" +
+		"a@example.com,,\n" +
+		",,\n" +
+		"b@example.com,,1G\n")
+	rows, err := parseImportCSV(in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("want 2 rows (blank skipped), got %d", len(rows))
+	}
+	if rows[0].Email != "a@example.com" || rows[1].Email != "b@example.com" {
+		t.Errorf("got %+v", rows)
+	}
+}
+
+func TestParseImportCSV_MissingHeader(t *testing.T) {
+	cases := []string{
+		"",                                               // empty file
+		"a@example.com,,1G\nb@example.com,,500M\n",       // no header
+		"address,password,quota\na@example.com,,1G\n",    // wrong first column
+		"email,quota,password\na@example.com,1G,\n",      // wrong column order
+		"email,password\na@example.com,\n",               // too few columns
+	}
+	for _, c := range cases {
+		_, err := parseImportCSV(strings.NewReader(c))
+		if err == nil {
+			t.Errorf("expected error for input %q", c)
+		}
+	}
+}
+
+func TestParseImportCSV_DuplicateRowsPreserved(t *testing.T) {
+	// Parser does NOT dedupe — that's the executor's job (it will surface
+	// `mailbox add` failing with "exists" as skipped:duplicate). We just
+	// confirm both rows are returned so the executor sees them.
+	in := strings.NewReader("email,password,quota\n" +
+		"dup@example.com,,1G\n" +
+		"dup@example.com,,2G\n")
+	rows, err := parseImportCSV(in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("want 2 rows, got %d", len(rows))
+	}
+	if rows[0].Email != rows[1].Email {
+		t.Errorf("expected both emails equal, got %q vs %q", rows[0].Email, rows[1].Email)
+	}
+}
+
+func TestParseImportCSV_InvalidEmails(t *testing.T) {
+	in := strings.NewReader("email,password,quota\n" +
+		"good@example.com,,1G\n" +
+		"not-an-email,,1G\n" +
+		"@nope.com,,1G\n" +
+		"trailing@,,1G\n" +
+		"also.good@example.org,,500M\n")
+	rows, err := parseImportCSV(in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rows) != 5 {
+		t.Fatalf("want 5 rows, got %d", len(rows))
+	}
+	if rows[0].Err != "" {
+		t.Errorf("row 0 should be valid, got err %q", rows[0].Err)
+	}
+	for _, i := range []int{1, 2, 3} {
+		if rows[i].Err != "invalid email" {
+			t.Errorf("row %d: want invalid email, got %q", i, rows[i].Err)
+		}
+	}
+	if rows[4].Err != "" {
+		t.Errorf("row 4 should be valid, got err %q", rows[4].Err)
+	}
+}
+
+func TestParseImportCSV_InvalidQuotas(t *testing.T) {
+	in := strings.NewReader("email,password,quota\n" +
+		"a@example.com,,1GB\n" +     // bad: GB suffix not allowed
+		"b@example.com,,1.5G\n" +    // bad: decimal
+		"c@example.com,,2X\n" +      // bad: unknown unit
+		"d@example.com,,1G\n" +      // good
+		"e@example.com,,0\n" +       // good (unlimited)
+		"f@example.com,,\n")         // good (default)
+	rows, err := parseImportCSV(in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rows) != 6 {
+		t.Fatalf("want 6 rows, got %d", len(rows))
+	}
+	for _, i := range []int{0, 1, 2} {
+		if !strings.HasPrefix(rows[i].Err, "bad quota") {
+			t.Errorf("row %d: want bad quota error, got %q", i, rows[i].Err)
+		}
+	}
+	for _, i := range []int{3, 4, 5} {
+		if rows[i].Err != "" {
+			t.Errorf("row %d should be valid, got err %q", i, rows[i].Err)
+		}
+	}
+}
+
+func TestParseImportCSV_HeaderCaseInsensitive(t *testing.T) {
+	in := strings.NewReader("Email, Password , QUOTA\na@example.com,,1G\n")
+	rows, err := parseImportCSV(in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Email != "a@example.com" {
+		t.Errorf("got %+v", rows)
+	}
+}
+
+func TestParseImportCSV_RowCap(t *testing.T) {
+	var sb strings.Builder
+	sb.WriteString("email,password,quota\n")
+	for i := 0; i <= maxImportRows; i++ {
+		sb.WriteString("user")
+		sb.WriteString(strings.Repeat("a", 1)) // unique-ish
+		// Use line index as part of email to keep them distinct.
+		sb.WriteString("@example.com,,1G\n")
+	}
+	// We wrote maxImportRows+1 data rows; parser should refuse.
+	_, err := parseImportCSV(strings.NewReader(sb.String()))
+	if err == nil {
+		t.Fatalf("expected error for over-cap upload")
+	}
+	if !strings.Contains(err.Error(), "too many") {
+		t.Errorf("expected 'too many' error, got %q", err.Error())
 	}
 }

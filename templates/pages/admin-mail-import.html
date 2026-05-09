@@ -1,0 +1,55 @@
+{{ define "content" }}
+{{ with .Data }}
+<header style="display:flex; align-items:baseline; justify-content:space-between; gap:16px;">
+  <h1 class="page-title" style="margin:0;">Bulk import mailboxes</h1>
+  <a href="/admin/mail" class="c-button c-button--text"><span class="c-button__label">← Back to Mail</span></a>
+</header>
+
+{{- if .Error }}
+<article class="c-card c-card--outlined" style="margin-top:16px; border-color:#b3261e;">
+  <div class="c-card__body"><strong style="color:#b3261e;">Couldn't process upload:</strong> {{ .Error }}</div>
+</article>
+{{- end }}
+
+{{- if not .Configured }}
+<article class="c-card c-card--outlined" style="margin-top:16px;">
+  <div class="c-card__body"><p style="color:var(--md-sys-color-on-surface-variant); margin:0;">Mail server not configured on this host (no <code>/usr/local/bin/mailbox</code>). Upload disabled.</p></div>
+</article>
+{{- end }}
+
+<article class="c-card c-card--outlined" style="margin-top:24px;">
+  <div class="c-card__header"><h2 class="c-card__title">CSV format</h2></div>
+  <div class="c-card__body">
+    <p style="margin:0 0 8px;">CSV header must be <code>email,password,quota</code>.</p>
+    <ul style="margin:0 0 8px; padding-left:20px; color:var(--md-sys-color-on-surface-variant);">
+      <li><strong>email</strong> — required, must be a valid address.</li>
+      <li><strong>password</strong> — may be empty (auto-generated; shown once on the result page).</li>
+      <li><strong>quota</strong> — may be empty (default <code>1G</code>), <code>0</code> (unlimited), or a size like <code>500M</code> / <code>2G</code>.</li>
+    </ul>
+    <p style="margin:0; color:var(--md-sys-color-on-surface-variant);">Maximum {{ .MaxRows }} rows per upload. Duplicate addresses are reported and skipped; one bad row does not abort the rest.</p>
+    <p style="margin:8px 0 0; font-family:monospace; font-size:0.875rem; padding:8px; background:var(--md-sys-color-surface-container-highest); border-radius:6px; white-space:pre;">email,password,quota
+support@shopifygmc.com,,2G
+sales@shopifygmc.com,Hunter2!,1G
+billing@shopifygmc.com,,
+intern@shopifygmc.com,,500M
+shared@shopifygmc.com,,0</p>
+  </div>
+</article>
+
+<article class="c-card c-card--outlined" style="margin-top:16px;">
+  <div class="c-card__header"><h2 class="c-card__title">Upload</h2></div>
+  <div class="c-card__body">
+    <form method="post" action="/admin/mail/import" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:12px;">
+      <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+      <label>
+        <span style="display:block; font-size:0.875rem; color:var(--md-sys-color-on-surface-variant);">CSV file</span>
+        <input type="file" name="file" accept=".csv,text/csv" required style="width:100%; padding:8px;">
+      </label>
+      <div>
+        <button type="submit" class="c-button c-button--filled" {{ if not .Configured }}disabled{{ end }}><span class="c-button__label">Import mailboxes</span></button>
+      </div>
+    </form>
+  </div>
+</article>
+{{ end }}
+{{ end }}

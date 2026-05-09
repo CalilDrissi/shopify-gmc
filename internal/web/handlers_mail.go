@@ -2,8 +2,10 @@ package web
 
 import (
 	"bufio"
+	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -22,6 +24,11 @@ const (
 	postfixAlias  = "/etc/postfix/virtual"
 	vmailBase     = "/var/mail/vmail"
 	defaultQuota  = "1G" // mirrors deploy/mailbox DEFAULT_QUOTA
+	// Bulk import caps. 1000 rows is enough for any realistic team
+	// provision; 8 MiB upload is plenty for that many rows of
+	// `email,password,quota` (~80 chars each).
+	maxImportRows      = 1000
+	maxImportUploadMem = 8 << 20
 )
 
 var (
@@ -503,4 +510,203 @@ func firstNonNilErrText(errs ...error) string {
 		}
 	}
 	return ""
+}
+
+// ----------------------------------------------------------------------------
+// Bulk CSV import
+// ----------------------------------------------------------------------------
+
+// ImportRow is a single parsed row from the upload CSV. Validation errors
+// are stamped on `Err` so the per-row results table can show why a row was
+// skipped without blowing up the whole batch.
+type ImportRow struct {
+	LineNo   int    // 1-based line in the CSV (header is line 1, first data row line 2)
+	Email    string
+	Password string
+	Quota    string
+	Err      string // empty = row passed pre-flight validation
+}
+
+// ImportResult is one row in the post-execute table the result page renders.
+// `Status` is one of "created", "skipped:duplicate", "error:<reason>".
+type ImportResult struct {
+	LineNo   int
+	Email    string
+	Password string // generated-or-supplied; one-time display
+	Quota    string
+	Status   string
+}
+
+// parseImportCSV reads the upload, validates each row against emailRE +
+// quotaSizeRE, and returns the parsed rows. The header row must be exactly
+// `email,password,quota` (case-insensitive, trimmed). Returns an error only
+// for problems that mean the upload is unusable (missing/wrong header,
+// over the row cap). Per-row validation problems are stamped on
+// ImportRow.Err so the caller can render them in the result table.
+func parseImportCSV(r io.Reader) ([]ImportRow, error) {
+	cr := csv.NewReader(r)
+	cr.FieldsPerRecord = -1 // tolerate ragged rows; we validate cell counts ourselves
+	cr.TrimLeadingSpace = true
+
+	header, err := cr.Read()
+	if err == io.EOF {
+		return nil, errors.New("empty CSV (no header row)")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read header: %w", err)
+	}
+	if len(header) < 3 ||
+		!strings.EqualFold(strings.TrimSpace(header[0]), "email") ||
+		!strings.EqualFold(strings.TrimSpace(header[1]), "password") ||
+		!strings.EqualFold(strings.TrimSpace(header[2]), "quota") {
+		return nil, errors.New("CSV header must be `email,password,quota`")
+	}
+
+	var out []ImportRow
+	lineNo := 1
+	for {
+		rec, err := cr.Read()
+		if err == io.EOF {
+			break
+		}
+		lineNo++
+		if err != nil {
+			return nil, fmt.Errorf("line %d: %w", lineNo, err)
+		}
+		// Pad short records to 3 cells so trim/index never panics.
+		for len(rec) < 3 {
+			rec = append(rec, "")
+		}
+		email := strings.TrimSpace(strings.ToLower(rec[0]))
+		password := strings.TrimSpace(rec[1])
+		quota := strings.TrimSpace(rec[2])
+		if email == "" && password == "" && quota == "" {
+			continue // blank line in the middle of the CSV — skip silently
+		}
+
+		row := ImportRow{LineNo: lineNo, Email: email, Password: password, Quota: quota}
+		switch {
+		case !emailRE.MatchString(email):
+			row.Err = "invalid email"
+		case !quotaSizeRE.MatchString(quota):
+			row.Err = "bad quota (use 1G, 500M, 2K, 0=unlimited, or empty=default)"
+		}
+		out = append(out, row)
+
+		if len(out) > maxImportRows {
+			return nil, fmt.Errorf("too many rows (max %d)", maxImportRows)
+		}
+	}
+	return out, nil
+}
+
+// MailImportPage renders the upload form.
+func (h *AdminHandlers) MailImportPage(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	d.Title = "Bulk import mailboxes"
+	d.Data = map[string]any{
+		"Configured": mailboxConfigured(),
+		"MaxRows":    maxImportRows,
+	}
+	h.renderAdmin(w, r, "admin-mail-import", *d)
+}
+
+// MailImportSubmit accepts the CSV upload, runs `mailbox add` per valid row,
+// and renders a per-row result table. Partial failures are surfaced; one bad
+// row never aborts the rest. Generated passwords are shown once on this
+// response — there is no second chance to retrieve them.
+func (h *AdminHandlers) MailImportSubmit(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	if !mailboxConfigured() {
+		http.Error(w, "mail not configured on this host", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseMultipartForm(maxImportUploadMem); err != nil {
+		http.Error(w, "bad upload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "missing file field", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	rows, parseErr := parseImportCSV(file)
+	if parseErr != nil {
+		d.Title = "Bulk import mailboxes"
+		d.Data = map[string]any{
+			"Configured": true,
+			"MaxRows":    maxImportRows,
+			"Error":      parseErr.Error(),
+		}
+		h.renderAdmin(w, r, "admin-mail-import", *d)
+		return
+	}
+
+	results := make([]ImportResult, 0, len(rows))
+	var created, skipped, errored int
+	for _, row := range rows {
+		res := ImportResult{LineNo: row.LineNo, Email: row.Email, Quota: row.Quota}
+		if row.Err != "" {
+			res.Status = "error:" + row.Err
+			errored++
+			results = append(results, res)
+			continue
+		}
+		args := []string{mailboxBinary, "add", row.Email}
+		if row.Password != "" {
+			args = append(args, row.Password)
+		}
+		out, addErr := runSudo(args...)
+		if addErr != nil {
+			combined := strings.ToLower(out + " " + addErr.Error())
+			if strings.Contains(combined, "exists") || strings.Contains(combined, "duplicate") {
+				res.Status = "skipped:duplicate"
+				skipped++
+			} else {
+				res.Status = "error:" + trimOut(addErr.Error()+"\n"+out)
+				errored++
+			}
+			results = append(results, res)
+			continue
+		}
+		if row.Password != "" {
+			res.Password = row.Password
+		} else {
+			res.Password = extractCLIField(out, "password:")
+		}
+		if row.Quota != "" {
+			if _, qErr := runSudo(mailboxBinary, "quota", row.Email, row.Quota); qErr != nil {
+				// Mailbox got created but quota set failed — surface as a
+				// warning rather than a hard error so the operator can
+				// retry the quota step from the main page.
+				res.Status = "created (quota failed: " + trimOut(qErr.Error()) + ")"
+				created++
+				results = append(results, res)
+				continue
+			}
+		}
+		res.Status = "created"
+		created++
+		results = append(results, res)
+	}
+
+	d.Title = "Bulk import results"
+	d.Data = map[string]any{
+		"Results": results,
+		"Total":   len(results),
+		"Created": created,
+		"Skipped": skipped,
+		"Errored": errored,
+	}
+	h.renderAdmin(w, r, "admin-mail-import-result", *d)
 }
