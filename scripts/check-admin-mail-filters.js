@@ -45,11 +45,12 @@ function localPart(e) { return e.split('@')[0]; }
 function domain(e) { return e.split('@')[1]; }
 
 function countMail(folder) {
-  // folder: 'inbox' or 'junk'
-  const dir = folder === 'junk'
-    ? `/var/mail/vmail/${domain(email)}/${localPart(email)}/.Junk/cur`
-    : `/var/mail/vmail/${domain(email)}/${localPart(email)}/cur`;
-  const out = ssh(`ls -1 ${dir} 2>/dev/null | wc -l`).trim();
+  // Fresh deliveries land in maildir's `new/`; only after IMAP read does
+  // the mail get moved into `cur/`. Count both so we don't miss messages.
+  const root = folder === 'junk'
+    ? `/var/mail/vmail/${domain(email)}/${localPart(email)}/.Junk`
+    : `/var/mail/vmail/${domain(email)}/${localPart(email)}`;
+  const out = ssh(`(ls -1 ${root}/cur 2>/dev/null; ls -1 ${root}/new 2>/dev/null) | wc -l`).trim();
   return parseInt(out, 10) || 0;
 }
 

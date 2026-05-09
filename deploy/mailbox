@@ -63,7 +63,10 @@ extract_quota_size() {
 # if empty, no rule (Dovecot's plugin defaults apply).
 quota_field_for() {
   local size="${1:-}"
-  if [ -z "$size" ] || [ "$size" = "0" ]; then
+  # Empty → no override (mailbox falls back to system default).
+  # "0" → explicit unlimited rule (Dovecot reads 0 as no cap).
+  # Anything else → literal storage rule.
+  if [ -z "$size" ]; then
     echo ""
   else
     echo "userdb_quota_rule=*:storage=$size"

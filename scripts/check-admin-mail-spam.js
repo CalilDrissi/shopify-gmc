@@ -63,13 +63,15 @@ function sendFrom(from, subject) {
 }
 
 function countMessagesIn(folder) {
-  // folder = "cur" (inbox) or ".Junk/cur" — return number of files.
-  // Maildir layout: /var/mail/vmail/<domain>/<local>/<folder>/
+  // folder is the maildir folder NAME ("cur", ".Junk", etc.). Count both
+  // `new/` (freshly delivered, not yet IMAP-read) and `cur/` (read).
   const local = email.split('@')[0];
   const domain = email.split('@')[1];
-  const path = `/var/mail/vmail/${domain}/${local}/${folder}`;
+  // If folder ends in /cur, strip it so we can count new+cur of its parent.
+  const root = folder.replace(/\/?cur$/, '');
+  const base = `/var/mail/vmail/${domain}/${local}${root ? '/' + root : ''}`;
   try {
-    const out = ssh(`ls -1 ${path} 2>/dev/null | wc -l`);
+    const out = ssh(`(ls -1 ${base}/cur 2>/dev/null; ls -1 ${base}/new 2>/dev/null) | wc -l`);
     return parseInt(out.trim(), 10) || 0;
   } catch (_) {
     return 0;
