@@ -185,8 +185,6 @@ func main() {
 		{Name: "gmc-picker", Layout: "templates/layouts/public.html", Template: "templates/pages/gmc-picker.html"},
 		{Name: "billing", Layout: "templates/layouts/tenant.html", Template: "templates/pages/billing.html"},
 		{Name: "admin-login", Layout: "templates/layouts/public.html", Template: "templates/pages/admin-login.html"},
-		{Name: "admin-totp-enroll", Layout: "templates/layouts/public.html", Template: "templates/pages/admin-totp-enroll.html"},
-		{Name: "admin-totp-verify", Layout: "templates/layouts/public.html", Template: "templates/pages/admin-totp-verify.html"},
 		{Name: "admin-dashboard", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-dashboard.html"},
 		{Name: "admin-tenants", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-tenants.html"},
 		{Name: "admin-tenant-detail", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-tenant-detail.html"},
@@ -414,10 +412,6 @@ func main() {
 
 	mux.HandleFunc("GET /admin/login", adminH.LoginForm)
 	mux.HandleFunc("POST /admin/login", adminH.Login)
-	mux.HandleFunc("GET /admin/totp/enroll", adminH.TOTPEnrollForm)
-	mux.HandleFunc("POST /admin/totp/enroll", adminH.TOTPEnroll)
-	mux.HandleFunc("GET /admin/totp/verify", adminH.TOTPVerifyForm)
-	mux.HandleFunc("POST /admin/totp/verify", adminH.TOTPVerify)
 	mux.HandleFunc("POST /admin/logout", adminH.Logout)
 	mux.HandleFunc("GET /admin/{$}", adminH.Dashboard)
 	mux.HandleFunc("GET /admin", adminH.Dashboard)

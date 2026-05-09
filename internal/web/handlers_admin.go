@@ -2,10 +2,8 @@ package web
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -22,9 +20,7 @@ import (
 )
 
 const (
-	AdminSessionTTL  = 4 * time.Hour
-	preTOTPCookieTTL = 5 * time.Minute
-	preTOTPCookie    = "admin_pretotp"
+	AdminSessionTTL = 4 * time.Hour
 )
 
 type AdminHandlers struct {
@@ -68,7 +64,7 @@ func (h *AdminHandlers) renderAdmin(w http.ResponseWriter, r *http.Request, page
 }
 
 // ============================================================================
-// Admin login (password) → TOTP gate → admin session
+// Admin login (password → admin session)
 // ============================================================================
 
 type adminLoginFields struct {
@@ -119,149 +115,14 @@ func (h *AdminHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		flash(&bannerVars{Variant: "critical", Title: "Sign-in failed", Message: "Invalid credentials."})
 		return
 	}
-	admin, err := h.Store.PlatformAdmins.GetByUserID(r.Context(), h.Pool, user.ID)
-	if err != nil {
+	if _, err := h.Store.PlatformAdmins.GetByUserID(r.Context(), h.Pool, user.ID); err != nil {
 		flash(&bannerVars{Variant: "critical", Title: "Not authorised", Message: "This account is not a platform admin."})
 		return
 	}
-
-	// Stash the verified user id in a short-lived signed cookie ("pre-TOTP").
-	if err := h.writePreTOTPCookie(w, user.ID); err != nil {
-		http.Error(w, "cookie: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if admin.TOTPEnrolledAt == nil {
-		http.Redirect(w, r, "/admin/totp/enroll", http.StatusFound)
-		return
-	}
-	http.Redirect(w, r, "/admin/totp/verify", http.StatusFound)
-}
-
-func (h *AdminHandlers) writePreTOTPCookie(w http.ResponseWriter, userID uuid.UUID) error {
-	return h.Cookies.Write(w, preTOTPCookie, "/admin",
-		auth.SessionCookie{SessionID: uuid.Nil, Token: userID.String()},
-		time.Now().Add(preTOTPCookieTTL))
-}
-
-func (h *AdminHandlers) readPreTOTPCookie(r *http.Request) (uuid.UUID, error) {
-	cv, err := h.Cookies.Read(r, preTOTPCookie)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	return uuid.Parse(cv.Token)
-}
-
-// ============================================================================
-// TOTP enrollment + verification
-// ============================================================================
-
-func (h *AdminHandlers) TOTPEnrollForm(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.readPreTOTPCookie(r)
-	if err != nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
-		return
-	}
-	user, err := h.Store.Users.GetByID(r.Context(), h.Pool, userID)
-	if err != nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
-		return
-	}
-	setup, err := auth.GenerateTOTP("gmcauditor", user.Email)
-	if err != nil {
-		http.Error(w, "totp gen: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	pngBytes, err := auth.TOTPQRPNG(setup, 240, 240)
-	if err != nil {
-		http.Error(w, "qr: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	qrDataURL := template.URL("data:image/png;base64," + base64.StdEncoding.EncodeToString(pngBytes))
-
-	t, _ := h.Renderer.Page("admin-totp-enroll")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = t.ExecuteTemplate(w, "layout-public", map[string]any{
-		"Title":     "Set up two-factor",
-		"Email":     user.Email,
-		"Secret":    setup.Secret,
-		"OTPURL":    setup.URL,
-		"QRDataURL": qrDataURL,
-		"Fields": map[string]any{
-			"Code": formField{Label: "Authenticator code", Input: inputField{Type: "text", Name: "code", ID: "code", Required: true, Autocomplete: "one-time-code"}},
-		},
-	})
-}
-
-func (h *AdminHandlers) TOTPEnroll(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	userID, err := h.readPreTOTPCookie(r)
-	if err != nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
-		return
-	}
-	secret := r.FormValue("secret")
-	code := r.FormValue("code")
-	if !auth.ValidateTOTP(secret, code) {
-		// re-render the form with a flash; for brevity, redirect back with err
-		http.Redirect(w, r, "/admin/totp/enroll?err=invalid", http.StatusFound)
-		return
-	}
-	if err := h.Store.PlatformAdmins.SetTOTPSecret(r.Context(), h.Pool, userID, secret, time.Now()); err != nil {
-		http.Error(w, "save secret: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if err := h.startAdminSession(w, r, userID); err != nil {
+	if err := h.startAdminSession(w, r, user.ID); err != nil {
 		http.Error(w, "session: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.Cookies.Clear(w, preTOTPCookie, "/admin")
-	http.Redirect(w, r, "/admin", http.StatusFound)
-}
-
-func (h *AdminHandlers) TOTPVerifyForm(w http.ResponseWriter, r *http.Request) {
-	if _, err := h.readPreTOTPCookie(r); err != nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
-		return
-	}
-	t, _ := h.Renderer.Page("admin-totp-verify")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = t.ExecuteTemplate(w, "layout-public", map[string]any{
-		"Title": "Two-factor required",
-		"Fields": map[string]any{
-			"Code": formField{Label: "Authenticator code", Input: inputField{Type: "text", Name: "code", ID: "code", Required: true, Autocomplete: "one-time-code"}},
-		},
-	})
-}
-
-func (h *AdminHandlers) TOTPVerify(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	userID, err := h.readPreTOTPCookie(r)
-	if err != nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
-		return
-	}
-	admin, err := h.Store.PlatformAdmins.GetByUserID(r.Context(), h.Pool, userID)
-	if err != nil || admin.TOTPSecret == nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
-		return
-	}
-	code := r.FormValue("code")
-	if !auth.ValidateTOTP(*admin.TOTPSecret, code) {
-		http.Redirect(w, r, "/admin/totp/verify?err=invalid", http.StatusFound)
-		return
-	}
-	if err := h.startAdminSession(w, r, userID); err != nil {
-		http.Error(w, "session: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	h.Cookies.Clear(w, preTOTPCookie, "/admin")
 	http.Redirect(w, r, "/admin", http.StatusFound)
 }
 
