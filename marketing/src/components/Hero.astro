@@ -1,0 +1,79 @@
+---
+import MockGoogleSearch from './MockGoogleSearch.astro';
+const products = [
+  { title: 'Aero Pro wireless headphones', price: '$129', store: 'acmeaudio.com', img: 'https://images.pexels.com/photos/3756879/pexels-photo-3756879.jpeg?auto=compress&cs=tinysrgb&w=300' },
+  { title: 'Studio over-ear headphones', price: '$189', store: 'soundco.com', img: 'https://images.pexels.com/photos/3394650/pexels-photo-3394650.jpeg?auto=compress&cs=tinysrgb&w=300' },
+  { title: 'Daily commuter buds', price: '$79', store: 'audiomax.com', img: 'https://images.pexels.com/photos/8534088/pexels-photo-8534088.jpeg?auto=compress&cs=tinysrgb&w=300' },
+  { title: 'Pro travel headphones', price: '$229', store: 'roamaudio.com', img: 'https://images.pexels.com/photos/3945667/pexels-photo-3945667.jpeg?auto=compress&cs=tinysrgb&w=300' },
+];
+---
+<section class="pt-12 sm:pt-16 pb-16 relative overflow-hidden">
+  <!-- soft brand-tint bg -->
+  <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
+    <div class="absolute -top-32 -right-24 w-[40rem] h-[40rem] rounded-full bg-md-primary-container opacity-50 blur-3xl"></div>
+    <div class="absolute -bottom-40 -left-24 w-[30rem] h-[30rem] rounded-full bg-md-tertiary-container opacity-40 blur-3xl"></div>
+  </div>
+
+  <div class="container-page">
+    <div class="grid gap-12 lg:gap-16 lg:grid-cols-[1.05fr_1fr] items-center">
+      <!-- LEFT: copy + form -->
+      <div>
+        <span class="eyebrow">
+          <svg viewBox="0 0 109 124" class="w-4 h-4" aria-hidden="true"><path fill="#95BF47" d="M74.7 14.8c.3-.3-.6-.4-.9-.4-.3 0-7.7-.4-7.7-.4S60 8.5 59.3 7.8c-.7-.7-1.9-.5-2.4-.4-.1 0-1.5.4-3.7 1.1-.3-1-.7-2.3-1.5-3.5C49.7 1 47.3.4 45.1.4 39.6.5 33.8 5.7 28.9 14c-3.7 6.2-6.2 14-7 20.1-6.6 2-11.2 3.4-11.4 3.5-3.3 1-3.4 1.1-3.8 4.2L0 116.4l72 12.4 31.2-7.7c0 .1-28.2-105.9-28.5-106.3Z"/><path fill="#5E8E3E" d="M73.8 14.4c-.4 0-7.7-.4-7.7-.4S60 8.5 59.3 7.8c-.3-.3-.6-.4-.9-.5l-5.4 121.5 31.2-7.7s-9.6-65-9.7-65.5c-.7-3.5-2.6-3.7-3.5-3.8-.7-.1-1.7.1-2.7.4-.6-1.6-1.3-3.5-2.5-5.5-2.4-4.6-7-9.4-12.5-9.4-1.5 0-3 .5-4.4 1.4Z"/></svg>
+          Built for Shopify · From $19/mo · Free first audit
+        </span>
+        <h1 class="display-lg mt-5 text-md-on-surface">
+          Stop losing sales to <span class="bg-gradient-to-r from-md-primary to-[#3c6473] bg-clip-text text-transparent">Merchant Center suspensions.</span>
+        </h1>
+        <p class="body-lg text-md-on-surface-variant mt-5 max-w-xl">
+          See today's disapprovals free in 90 seconds. Then keep watching — so the next theme
+          update or feed change doesn't take you off Google Shopping again.
+        </p>
+
+        <form
+          action="/signup"
+          method="get"
+          class="mt-7 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-1.5 sm:bg-md-surface-container-lowest sm:rounded-full sm:p-1.5 sm:shadow-m3-2 sm:border sm:border-md-outline-variant"
+        >
+          <label for="hero-store" class="sr-only">Your Shopify store URL</label>
+          <input
+            id="hero-store"
+            type="url"
+            name="store"
+            required
+            autocomplete="url"
+            inputmode="url"
+            placeholder="your ecommerce domain"
+            class="flex-1 rounded-full px-5 py-3.5 bg-md-surface-container-low body-lg placeholder:text-md-on-surface-variant focus:outline-none focus:bg-md-surface-container-lowest sm:bg-transparent"
+          />
+          <button type="submit" class="btn-filled whitespace-nowrap text-base h-12 px-7 group">
+            Audit my store free
+            <svg viewBox="0 0 24 24" class="w-4 h-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true"><path fill="currentColor" d="M14 5l7 7-7 7v-4H3v-6h11V5z"/></svg>
+          </button>
+        </form>
+
+        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 body-sm text-md-on-surface-variant">
+          <span class="flex items-center gap-1.5"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 text-md-primary" aria-hidden="true"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg> First audit free</span>
+          <span class="flex items-center gap-1.5"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 text-md-primary" aria-hidden="true"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg> No credit card</span>
+          <span class="flex items-center gap-1.5"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 text-md-primary" aria-hidden="true"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg> Results in 90 seconds</span>
+        </div>
+
+        <!-- secondary subscribe path: pricing teaser + plans link -->
+        <div class="mt-7 flex items-center gap-3 flex-wrap">
+          <a href="#pricing" class="btn-tonal text-sm h-10 px-5">
+            See plans
+            <svg viewBox="0 0 24 24" class="w-3.5 h-3.5" aria-hidden="true"><path fill="currentColor" d="M14 5l7 7-7 7v-4H3v-6h11V5z"/></svg>
+          </a>
+          <span class="body-sm text-md-on-surface-variant">
+            Continuous monitoring from <strong class="text-md-on-surface">$19/mo</strong> · 14-day refund
+          </span>
+        </div>
+      </div>
+
+      <!-- RIGHT: Google SERP mock — your store appears in Shopping results, marked approved -->
+      <div class="lg:translate-y-2">
+        <MockGoogleSearch products={products} approvedIndex={0} caption="Your products appear in Google Shopping" query="wireless headphones" />
+      </div>
+    </div>
+  </div>
+</section>

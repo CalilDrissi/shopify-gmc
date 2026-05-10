@@ -1,0 +1,78 @@
+---
+interface Props { variant?: 'hero' | 'card'; }
+const { variant = 'hero' } = Astro.props;
+const isHero = variant === 'hero';
+---
+<form
+  data-audit-form
+  class:list={[
+    'flex flex-col gap-3',
+    isHero ? 'min-[880px]:flex-row min-[880px]:items-center min-[880px]:bg-md-surface-container-lowest min-[880px]:rounded-full min-[880px]:p-1.5 min-[880px]:shadow-m3-2' : '',
+    !isHero ? 'card-elevated' : '',
+  ]}
+  novalidate
+>
+  <label class="sr-only" for={`${variant}-url`}>Your store URL</label>
+  <input
+    id={`${variant}-url`}
+    type="url"
+    name="url"
+    required
+    placeholder="yourstore.myshopify.com"
+    class:list={[
+      'flex-1 rounded-full px-5 py-3 bg-md-surface-container-low body-md',
+      'placeholder:text-md-on-surface-variant',
+      'focus:outline-none focus:bg-md-surface-container-lowest',
+      isHero ? 'min-[880px]:bg-transparent min-[880px]:py-3' : '',
+      !isHero ? 'border border-md-outline-variant' : '',
+    ]}
+  />
+  <label class="sr-only" for={`${variant}-email`}>Email</label>
+  <input
+    id={`${variant}-email`}
+    type="email"
+    name="email"
+    required
+    placeholder="you@store.com"
+    class:list={[
+      'flex-1 rounded-full px-5 py-3 bg-md-surface-container-low body-md',
+      'placeholder:text-md-on-surface-variant',
+      'focus:outline-none focus:bg-md-surface-container-lowest',
+      isHero ? 'min-[880px]:bg-transparent' : '',
+      !isHero ? 'border border-md-outline-variant' : '',
+    ]}
+  />
+  <button type="submit" class="btn-filled whitespace-nowrap" data-audit-button>
+    Get free audit
+  </button>
+</form>
+<p class="body-sm text-md-on-surface-variant mt-3">Free teaser audit — no credit card. Full report in &lt; 2 minutes.</p>
+
+<script>
+  // Tiny inline-friendly progressive enhancement: no framework.
+  document.querySelectorAll<HTMLFormElement>('form[data-audit-form]').forEach((form) => {
+    const btn = form.querySelector<HTMLButtonElement>('[data-audit-button]');
+    if (!btn) return;
+    const original = btn.textContent;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      btn.textContent = 'Auditing…';
+      try {
+        await fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(new FormData(form))),
+        }).catch(() => {});
+      } catch {}
+      setTimeout(() => {
+        btn.textContent = '✓ Report sent — check your inbox';
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.disabled = false;
+          form.reset();
+        }, 2600);
+      }, 900);
+    });
+  });
+</script>

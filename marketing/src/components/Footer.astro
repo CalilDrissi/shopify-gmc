@@ -1,0 +1,69 @@
+---
+const cols = [
+  {
+    title: 'Product',
+    links: [
+      { href: '#how-it-works', label: 'How it works' },
+      { href: '#what-we-check', label: 'Checks' },
+      { href: '/pricing', label: 'Pricing' },
+      { href: '/changelog', label: 'Changelog' },
+    ],
+  },
+  {
+    title: 'Company',
+    links: [
+      { href: '/about', label: 'About' },
+      { href: '/contact', label: 'Contact' },
+      { href: '/privacy', label: 'Privacy' },
+      { href: '/terms', label: 'Terms' },
+    ],
+  },
+  {
+    title: 'Resources',
+    links: [
+      { href: '/guides', label: 'Guides' },
+      { href: '/docs', label: 'Docs' },
+      { href: '/status', label: 'Status' },
+    ],
+  },
+  {
+    title: 'Get in touch',
+    links: [
+      { href: 'mailto:support@shopifygmc.com', label: 'support@shopifygmc.com' },
+    ],
+  },
+];
+const year = new Date().getFullYear();
+---
+<footer class="border-t border-md-outline-variant bg-md-surface-container-lowest">
+  <div class="container-page py-16">
+    <div class="grid gap-10 grid-cols-2 min-[880px]:grid-cols-5">
+      <div class="col-span-2">
+        <a href="/" class="flex items-center gap-2 font-semibold">
+          <svg viewBox="0 0 24 24" class="w-7 h-7" aria-hidden="true">
+            <path fill="#006d52" d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4Z" />
+            <path fill="#9af5cd" d="m10.5 13 1.7 1.7L16 11l-1.4-1.4-2.4 2.4-1-.7-.7 1.7Z" />
+          </svg>
+          shopifygmc
+        </a>
+        <p class="body-md text-md-on-surface-variant mt-3 max-w-sm">
+          Continuous Google Merchant Center audits for Shopify stores. Catch what suspends accounts before it does.
+        </p>
+      </div>
+      {cols.map((c) => (
+        <div>
+          <h4 class="label-md text-md-on-surface-variant uppercase">{c.title}</h4>
+          <ul class="mt-3 space-y-2">
+            {c.links.map((l) => (
+              <li><a href={l.href} class="body-md hover:text-md-primary">{l.label}</a></li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+    <div class="mt-12 pt-6 border-t border-md-outline-variant flex flex-wrap items-center justify-between gap-3">
+      <p class="body-sm text-md-on-surface-variant">© {year} shopifygmc. Not affiliated with Shopify or Google.</p>
+      <p class="body-sm text-md-on-surface-variant">Made for Shopify merchants tired of feed surprises.</p>
+    </div>
+  </div>
+</footer>

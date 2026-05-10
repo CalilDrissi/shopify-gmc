@@ -1,0 +1,23 @@
+---
+import MockGoogleSearch from './MockGoogleSearch.astro';
+const products = [
+  { title: 'Aero Pro headphones', price: '$129', store: 'acmeaudio.com', img: 'https://images.pexels.com/photos/3756879/pexels-photo-3756879.jpeg?auto=compress&cs=tinysrgb&w=300' },
+  { title: 'Studio over-ear', price: '$189', store: 'acmeaudio.com', img: 'https://images.pexels.com/photos/3394650/pexels-photo-3394650.jpeg?auto=compress&cs=tinysrgb&w=300' },
+  { title: 'Daily commuter buds', price: '$79', store: 'acmeaudio.com', img: 'https://images.pexels.com/photos/8534088/pexels-photo-8534088.jpeg?auto=compress&cs=tinysrgb&w=300' },
+  { title: 'Pro travel headphones', price: '$229', store: 'acmeaudio.com', img: 'https://images.pexels.com/photos/3945667/pexels-photo-3945667.jpeg?auto=compress&cs=tinysrgb&w=300' },
+];
+---
+<section class="py-16 sm:py-24 bg-md-surface-container-low">
+  <div class="container-page">
+    <div class="max-w-2xl mb-10">
+      <span class="eyebrow">What's at stake</span>
+      <h2 class="display-md mt-3">One bad SKU, four lost placements.</h2>
+      <p class="body-lg text-md-on-surface-variant mt-3">
+        When Google flags a product, it disappears from Shopping results. Your competitors stay; you don't.
+      </p>
+    </div>
+    <div class="max-w-hero mx-auto">
+      <MockGoogleSearch products={products} suspendedIndex={3} caption="Your store, removed" query="wireless headphones" />
+    </div>
+  </div>
+</section>

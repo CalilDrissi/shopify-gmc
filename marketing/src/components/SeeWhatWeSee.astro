@@ -1,0 +1,20 @@
+---
+import MockShopifyStore from './MockShopifyStore.astro';
+import MockGmcDashboard from './MockGmcDashboard.astro';
+---
+<section class="py-16 sm:py-24">
+  <div class="container-page">
+    <div class="max-w-2xl mb-10">
+      <span class="eyebrow">See what we see</span>
+      <h2 class="display-md mt-3">Your storefront, side by side with Google's view.</h2>
+      <p class="body-lg text-md-on-surface-variant mt-3">
+        Most disapprovals come from a mismatch between what your store shows shoppers and what Google
+        crawls. We diff both sides for every SKU.
+      </p>
+    </div>
+    <div class="grid gap-8 grid-cols-1 min-[880px]:grid-cols-2">
+      <MockShopifyStore caption="Your storefront — what shoppers see" />
+      <MockGmcDashboard caption="What Google sees in your feed" />
+    </div>
+  </div>
+</section>

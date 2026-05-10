@@ -1,0 +1,83 @@
+---
+const tiers = [
+  {
+    name: 'Free audit',
+    price: '$0',
+    cadence: 'one-time',
+    blurb: 'See what Google would flag right now.',
+    cta: 'Run free audit',
+    href: '/signup',
+    features: ['1 store', 'One full audit', 'Top 10 issues', 'Email report', 'No card required'],
+  },
+  {
+    name: 'Starter',
+    price: '$19',
+    cadence: '/mo',
+    blurb: 'For solo founders with one store.',
+    cta: 'Start Starter',
+    href: '/signup?plan=starter',
+    features: ['1 store', 'Weekly audits', 'All 29 checks', 'AI-generated fixes', 'Email alerts when something breaks'],
+  },
+  {
+    name: 'Growth',
+    price: '$49',
+    cadence: '/mo',
+    blurb: 'For brands running paid Shopping.',
+    cta: 'Start Growth',
+    href: '/signup?plan=growth',
+    popular: true,
+    features: ['3 stores', 'Daily audits', 'GMC API integration', 'Slack & email alerts', 'Audit history & diff'],
+  },
+  {
+    name: 'Agency',
+    price: '$199',
+    cadence: '/mo',
+    blurb: 'For teams managing client stores.',
+    cta: 'Start Agency',
+    href: '/signup?plan=agency',
+    features: ['25 stores', 'Hourly checks', 'White-label reports', 'API access', 'Priority support'],
+  },
+];
+---
+<section id="pricing" class="py-16 sm:py-24">
+  <div class="container-page">
+    <div class="max-w-2xl mb-10">
+      <span class="eyebrow">Pricing</span>
+      <h2 class="display-md mt-3">Free to find issues. Paid to stop them coming back.</h2>
+      <p class="body-lg text-md-on-surface-variant mt-3">
+        The free audit shows you today's problems. A subscription keeps watching every day —
+        so the next theme update or app change doesn't quietly take you off Shopping.
+      </p>
+    </div>
+    <div class="grid gap-4 grid-cols-1 min-[560px]:grid-cols-2 min-[1080px]:grid-cols-4">
+      {tiers.map((t) => (
+        <article class:list={[
+          'rounded-m3-lg p-6 flex flex-col',
+          t.popular ? 'border-2 border-md-primary shadow-m3-3 bg-md-surface-container-lowest relative' : 'card-outlined',
+        ]}>
+          {t.popular && (
+            <span class="absolute -top-3 left-6 pill bg-md-primary text-md-on-primary">Most popular</span>
+          )}
+          <h3 class="headline-md">{t.name}</h3>
+          <p class="body-sm text-md-on-surface-variant mt-1">{t.blurb}</p>
+          <div class="mt-5 flex items-baseline gap-1">
+            <span class="display-sm">{t.price}</span>
+            <span class="body-md text-md-on-surface-variant">{t.cadence}</span>
+          </div>
+          <ul class="mt-5 space-y-2 flex-1">
+            {t.features.map((f) => (
+              <li class="flex items-start gap-2 body-md">
+                <svg viewBox="0 0 24 24" class="w-4 h-4 mt-1 text-md-primary shrink-0" aria-hidden="true"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg>
+                {f}
+              </li>
+            ))}
+          </ul>
+          <a href={t.href} class:list={['mt-6', t.popular ? 'btn-filled' : 'btn-outlined']}>{t.cta}</a>
+        </article>
+      ))}
+    </div>
+    <p class="body-sm text-md-on-surface-variant mt-8 text-center">
+      Need more stores? <a href="/contact" class="text-md-primary underline">Talk to us</a> · 14-day refund · Cancel any time
+    </p>
+  </div>
+</section>

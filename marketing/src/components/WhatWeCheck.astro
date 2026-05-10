@@ -1,0 +1,67 @@
+---
+const crawler = [
+  'Title length & promotional text',
+  'Image dimensions ≥ 100×100',
+  'PDP price matches feed price',
+  'Schema.org Product markup',
+  'GTIN / MPN presence',
+  'Out-of-stock / 404 PDPs',
+  'Hreflang & locale targeting',
+  'Theme-injected ad text',
+  'Reviews app schema validity',
+  'Robots & noindex on PDPs',
+];
+const gmc = [
+  'Disapproved & warning items',
+  'Account-level suspensions',
+  'Pending review queue',
+  'Policy violation categories',
+  'Tax & shipping setup gaps',
+  'Free listings eligibility',
+  'Targets per country',
+  'Promotion conflicts',
+  'Performance data join',
+];
+---
+<section id="what-we-check" class="py-16 sm:py-24 bg-md-surface-container-low">
+  <div class="container-page">
+    <div class="max-w-2xl mb-10">
+      <span class="eyebrow">What we check</span>
+      <h2 class="display-md mt-3">Two angles, every SKU.</h2>
+      <p class="body-lg text-md-on-surface-variant mt-3">
+        We crawl your storefront the way Googlebot does, then read what Merchant Center reports.
+        Both sides line up — or we tell you exactly where they don't.
+      </p>
+    </div>
+    <div class="grid gap-6 grid-cols-1 min-[880px]:grid-cols-2">
+      <article class="card-outlined">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="pill bg-md-primary-container text-md-on-primary-container">Crawler</span>
+          <span class="body-sm text-md-on-surface-variant">{crawler.length} checks</span>
+        </div>
+        <ul class="divide-y divide-md-outline-variant">
+          {crawler.map((c) => (
+            <li class="flex items-center gap-3 py-2.5 body-md">
+              <svg viewBox="0 0 24 24" class="w-4 h-4 text-md-primary shrink-0" aria-hidden="true"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg>
+              {c}
+            </li>
+          ))}
+        </ul>
+      </article>
+      <article class="card-outlined">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="pill bg-md-tertiary-container text-md-on-surface">GMC API</span>
+          <span class="body-sm text-md-on-surface-variant">{gmc.length} checks</span>
+        </div>
+        <ul class="divide-y divide-md-outline-variant">
+          {gmc.map((c) => (
+            <li class="flex items-center gap-3 py-2.5 body-md">
+              <svg viewBox="0 0 24 24" class="w-4 h-4 text-md-tertiary shrink-0" aria-hidden="true"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg>
+              {c}
+            </li>
+          ))}
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>

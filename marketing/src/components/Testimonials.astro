@@ -1,0 +1,48 @@
+---
+const quotes = [
+  {
+    quote: 'We were getting suspension notices once a quarter. Six months in, zero. The diff alone was worth it.',
+    name: 'Maya Chen',
+    role: 'Head of Growth, Acme Audio',
+    metric: '−$24k/mo wasted ad spend',
+    img: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=200',
+  },
+  {
+    quote: 'I run feeds for 14 stores. The first audit found 380 disapprovals nobody had noticed. Took me a day to fix all of them.',
+    name: 'Daniel Park',
+    role: 'Founder, Park Ecommerce',
+    metric: '380 SKUs unblocked',
+    img: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=200',
+  },
+  {
+    quote: "It's the only tool that compared what we ship to what Google sees. Everything else just runs lint over the feed file.",
+    name: 'Rita Alvarez',
+    role: 'Ecommerce Lead, Folk & Field',
+    metric: '+19% Shopping CTR',
+    img: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200',
+  },
+];
+---
+<section id="testimonials" class="py-16 sm:py-24 bg-md-surface-container-low">
+  <div class="container-page">
+    <div class="max-w-2xl mb-10">
+      <span class="eyebrow">Customers</span>
+      <h2 class="display-md mt-3">Quietly running in 200+ stores.</h2>
+    </div>
+    <div class="grid gap-6 grid-cols-1 min-[880px]:grid-cols-3">
+      {quotes.map((q) => (
+        <figure class="card-outlined flex flex-col">
+          <blockquote class="body-md text-md-on-surface flex-1">"{q.quote}"</blockquote>
+          <figcaption class="mt-6 flex items-center gap-3">
+            <img src={q.img} alt={q.name} loading="lazy" width="48" height="48" class="w-12 h-12 rounded-full object-cover" />
+            <div>
+              <div class="font-medium">{q.name}</div>
+              <div class="body-sm text-md-on-surface-variant">{q.role}</div>
+            </div>
+          </figcaption>
+          <span class="pill bg-md-primary-container text-md-on-primary-container mt-4 self-start">{q.metric}</span>
+        </figure>
+      ))}
+    </div>
+  </div>
+</section>

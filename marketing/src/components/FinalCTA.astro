@@ -1,0 +1,25 @@
+---
+import AuditForm from './AuditForm.astro';
+---
+<section class="py-16 sm:py-24 bg-md-surface-container-low">
+  <div class="container-page">
+    <div class="grid gap-10 grid-cols-1 min-[880px]:grid-cols-2 items-center">
+      <div>
+        <span class="eyebrow">Get your free audit</span>
+        <h2 class="display-md mt-3">Find out what Google's about to disapprove.</h2>
+        <p class="body-lg text-md-on-surface-variant mt-3">
+          Drop your store URL. We'll crawl it, run all 29 checks, and email you a prioritised report in under two minutes.
+          No credit card.
+        </p>
+        <ul class="mt-6 space-y-2 body-md">
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" class="w-4 h-4 text-md-primary" aria-hidden="true"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg> Free teaser report</li>
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" class="w-4 h-4 text-md-primary" aria-hidden="true"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg> No GMC connection required for the first pass</li>
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" class="w-4 h-4 text-md-primary" aria-hidden="true"><path fill="currentColor" d="m9 16.2-3.5-3.5L4 14.2l5 5 11-11-1.5-1.5z"/></svg> Cancel any time, refund within 14 days</li>
+        </ul>
+      </div>
+      <div>
+        <AuditForm variant="card" />
+      </div>
+    </div>
+  </div>
+</section>

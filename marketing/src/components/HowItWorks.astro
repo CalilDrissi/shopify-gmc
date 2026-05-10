@@ -1,0 +1,36 @@
+---
+const steps = [
+  {
+    n: '01',
+    title: 'Connect',
+    body: 'Paste your store URL. Optionally connect Google Merchant Center via OAuth for the deep checks.',
+  },
+  {
+    n: '02',
+    title: 'Audit',
+    body: 'We crawl every PDP, fetch your feed, run 20+ crawler checks and 9 GMC API checks, then diff against your last audit.',
+  },
+  {
+    n: '03',
+    title: 'Fix',
+    body: 'You get a prioritised report with AI-generated fixes you can paste into your theme, app, or feed.',
+  },
+];
+---
+<section id="how-it-works" class="py-16 sm:py-24">
+  <div class="container-page">
+    <div class="max-w-2xl mb-10">
+      <span class="eyebrow">How it works</span>
+      <h2 class="display-md mt-3">Three steps. No agency on retainer.</h2>
+    </div>
+    <ol class="grid gap-6 grid-cols-1 min-[880px]:grid-cols-3">
+      {steps.map((s) => (
+        <li class="card-outlined">
+          <div class="text-md-primary font-semibold tracking-wider">{s.n}</div>
+          <h3 class="headline-md mt-2">{s.title}</h3>
+          <p class="body-md text-md-on-surface-variant mt-2">{s.body}</p>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>

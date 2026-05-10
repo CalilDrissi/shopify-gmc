@@ -1,0 +1,36 @@
+---
+const outcomes = [
+  {
+    metric: 'Hours saved',
+    title: 'Every audit, in two minutes.',
+    body: 'No more hand-checking 400 SKUs in Merchant Center. We diff feed vs. storefront and surface only the items that changed.',
+  },
+  {
+    metric: 'Suspensions avoided',
+    title: 'Catch issues before Google does.',
+    body: 'Continuous monitoring fires an alert the moment a check regresses, with the exact SKU and the fix applied.',
+  },
+  {
+    metric: 'Fixes shipped',
+    title: 'AI fixes you can paste in.',
+    body: 'Each issue comes with a generated patch — title rewrite, schema snippet, feed override — ready for your theme or app.',
+  },
+];
+---
+<section class="py-16 sm:py-24">
+  <div class="container-page">
+    <div class="max-w-2xl mb-10">
+      <span class="eyebrow">Outcome</span>
+      <h2 class="display-md mt-3">Stop firefighting feed errors.</h2>
+    </div>
+    <div class="grid gap-6 grid-cols-1 min-[880px]:grid-cols-3">
+      {outcomes.map((o) => (
+        <article class="card-outlined">
+          <span class="pill bg-md-primary-container text-md-on-primary-container">{o.metric}</span>
+          <h3 class="headline-md mt-4">{o.title}</h3>
+          <p class="body-md text-md-on-surface-variant mt-2">{o.body}</p>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>

@@ -1,0 +1,125 @@
+---
+const items = [
+  {
+    title: 'Suspended without warning',
+    body: "Google disapproves products silently. By the time you notice, your campaigns are paused and ad spend is wasted.",
+  },
+  {
+    title: 'Tiny errors that cost real money',
+    body: "Title gets truncated. Image is too small. GTIN is missing. Each one is small. Together, they kill your reach.",
+  },
+  {
+    title: 'Updates that quietly break things',
+    body: "Theme updates and reviews apps break your structured data. Nothing visible to you — but Google stops listing the product.",
+  },
+];
+---
+<section class="py-16 sm:py-20 bg-md-surface-container-low">
+  <div class="container-page">
+    <div class="max-w-2xl mb-10">
+      <span class="eyebrow">The problem</span>
+      <h2 class="display-md mt-3">Three failure modes, one outcome.</h2>
+      <p class="body-lg text-md-on-surface-variant mt-3">
+        If you've ever opened Merchant Center to a wall of red, you know these. We catch all three before Google does.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:gap-6 grid-cols-1 min-[880px]:grid-cols-3">
+
+      <!-- Card 1: Suspended without warning — shopping bag with a red stop sign -->
+      <article class="card-outlined overflow-hidden">
+        <div class="-mx-6 -mt-6 mb-5 h-44 bg-gradient-to-br from-md-error-container via-[#ffe7e3] to-md-surface-container-lowest flex items-center justify-center" aria-hidden="true">
+          <svg viewBox="0 0 240 160" class="w-full h-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="A shopping bag stopped by a red stop sign">
+            <!-- shopping bag -->
+            <g transform="translate(70 38)">
+              <path d="M10 30h70l-6 70a8 8 0 0 1-8 7H24a8 8 0 0 1-8-7L10 30z" fill="#ffffff" stroke="#181d1a" stroke-width="2.5" stroke-linejoin="round"/>
+              <path d="M30 32V20a15 15 0 0 1 30 0v12" fill="none" stroke="#181d1a" stroke-width="2.5" stroke-linecap="round"/>
+              <circle cx="32" cy="48" r="2.2" fill="#181d1a"/>
+              <circle cx="58" cy="48" r="2.2" fill="#181d1a"/>
+              <path d="M34 70q11 -8 22 0" fill="none" stroke="#181d1a" stroke-width="2.5" stroke-linecap="round" transform="rotate(180 45 70)"/>
+            </g>
+            <!-- stop sign over the bag -->
+            <g transform="translate(140 22)">
+              <polygon points="22,0 50,0 72,22 72,50 50,72 22,72 0,50 0,22"
+                       fill="#d93025" stroke="#ffffff" stroke-width="3"/>
+              <text x="36" y="46" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="18" fill="#ffffff" letter-spacing="0.5">STOP</text>
+            </g>
+            <!-- emphasis lines -->
+            <g stroke="#d93025" stroke-width="3" stroke-linecap="round" opacity="0.7">
+              <line x1="206" y1="35" x2="222" y2="28"/>
+              <line x1="210" y1="58" x2="228" y2="58"/>
+              <line x1="206" y1="80" x2="222" y2="86"/>
+            </g>
+          </svg>
+        </div>
+        <h3 class="headline-md">{items[0].title}</h3>
+        <p class="body-md text-md-on-surface-variant mt-2">{items[0].body}</p>
+      </article>
+
+      <!-- Card 2: Tiny errors — magnifying glass over a product card with red dots -->
+      <article class="card-outlined overflow-hidden">
+        <div class="-mx-6 -mt-6 mb-5 h-44 bg-gradient-to-br from-[#fef3c7] via-[#fff8e6] to-md-surface-container-lowest flex items-center justify-center" aria-hidden="true">
+          <svg viewBox="0 0 240 160" class="w-full h-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="A magnifying glass finding small errors on a product listing">
+            <!-- product card -->
+            <g transform="translate(50 30)">
+              <rect x="0" y="0" width="110" height="110" rx="10" fill="#ffffff" stroke="#181d1a" stroke-width="2.5"/>
+              <rect x="10" y="10" width="90" height="50" rx="6" fill="#eaf0eb"/>
+              <!-- product silhouette (headphones) -->
+              <g transform="translate(35 18)" fill="#404943">
+                <path d="M20 6a18 18 0 0 1 18 18v10h-6V24a12 12 0 0 0-24 0v10H2V24A18 18 0 0 1 20 6z"/>
+                <rect x="2" y="30" width="8" height="14" rx="2"/>
+                <rect x="30" y="30" width="8" height="14" rx="2"/>
+              </g>
+              <rect x="10" y="68" width="60" height="6" rx="3" fill="#c0c9c2"/>
+              <rect x="10" y="80" width="40" height="6" rx="3" fill="#c0c9c2"/>
+              <rect x="10" y="92" width="50" height="6" rx="3" fill="#c0c9c2"/>
+              <!-- red error dots highlighting issues -->
+              <circle cx="80" cy="71" r="5" fill="#d93025"/>
+              <text x="80" y="74.5" text-anchor="middle" font-family="Inter" font-size="7" font-weight="700" fill="#ffffff">!</text>
+              <circle cx="60" cy="83" r="5" fill="#d93025"/>
+              <text x="60" y="86.5" text-anchor="middle" font-family="Inter" font-size="7" font-weight="700" fill="#ffffff">!</text>
+            </g>
+            <!-- magnifying glass -->
+            <g transform="translate(126 60)">
+              <circle cx="32" cy="32" r="32" fill="#ffffff" fill-opacity="0.55" stroke="#181d1a" stroke-width="3"/>
+              <circle cx="32" cy="32" r="24" fill="none" stroke="#181d1a" stroke-width="2" stroke-dasharray="2 4" opacity="0.4"/>
+              <line x1="56" y1="56" x2="78" y2="78" stroke="#181d1a" stroke-width="6" stroke-linecap="round"/>
+              <line x1="56" y1="56" x2="78" y2="78" stroke="#404943" stroke-width="3" stroke-linecap="round"/>
+            </g>
+          </svg>
+        </div>
+        <h3 class="headline-md">{items[1].title}</h3>
+        <p class="body-md text-md-on-surface-variant mt-2">{items[1].body}</p>
+      </article>
+
+      <!-- Card 3: Updates that break things — two puzzle pieces with a crack between them -->
+      <article class="card-outlined overflow-hidden">
+        <div class="-mx-6 -mt-6 mb-5 h-44 bg-gradient-to-br from-md-tertiary-container via-[#daf3fa] to-md-surface-container-lowest flex items-center justify-center" aria-hidden="true">
+          <svg viewBox="0 0 240 160" class="w-full h-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Two puzzle pieces that no longer fit, with a small crack between them">
+            <!-- left puzzle piece -->
+            <g transform="translate(38 40)">
+              <path d="M0 0h50v18a8 8 0 0 0 16 0v-18h6v66H0z" fill="#9af5cd" stroke="#181d1a" stroke-width="2.5" stroke-linejoin="round"/>
+              <circle cx="22" cy="36" r="3" fill="#006d52"/>
+            </g>
+            <!-- right puzzle piece (rotated/displaced to suggest mismatch) -->
+            <g transform="translate(128 36) rotate(8)">
+              <path d="M6 6h66v50a8 8 0 0 1-16 0v-6H6z" fill="#c0e9fb" stroke="#181d1a" stroke-width="2.5" stroke-linejoin="round"/>
+              <circle cx="44" cy="30" r="3" fill="#3c6473"/>
+            </g>
+            <!-- red crack/lightning between -->
+            <g transform="translate(108 50)">
+              <path d="M2 0l8 16-6 4 12 22-2-18 6-2-6-22z" fill="#d93025" stroke="#ffffff" stroke-width="2"/>
+            </g>
+            <!-- small warning sparks -->
+            <g fill="#d93025">
+              <circle cx="115" cy="38" r="3"/>
+              <circle cx="120" cy="118" r="3"/>
+              <circle cx="100" cy="120" r="2"/>
+            </g>
+          </svg>
+        </div>
+        <h3 class="headline-md">{items[2].title}</h3>
+        <p class="body-md text-md-on-surface-variant mt-2">{items[2].body}</p>
+      </article>
+    </div>
+  </div>
+</section>
