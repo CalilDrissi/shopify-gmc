@@ -91,7 +91,7 @@ func TestRequireUser_HappyPath(t *testing.T) {
 	}
 }
 
-func TestRequireUser_NoCookie(t *testing.T) {
+func TestRequireUser_NoCookie_BrowserGetRedirects(t *testing.T) {
 	t.Parallel()
 	cm, store := newCookieAndStore(t)
 	users := &fakeUserLookup{users: map[uuid.UUID]auth.User{}}
@@ -100,10 +100,49 @@ func TestRequireUser_NoCookie(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r := httptest.NewRequest(http.MethodGet, "/t/sarahs-shop/audits", nil)
+	r.Header.Set("Accept", "text/html")
 	h.ServeHTTP(w, r)
-	if w.Result().StatusCode != http.StatusUnauthorized {
-		t.Errorf("status=%d want 401", w.Result().StatusCode)
+	if got := w.Result().StatusCode; got != http.StatusFound {
+		t.Errorf("status=%d want 302", got)
+	}
+	loc := w.Result().Header.Get("Location")
+	if loc != "/login?next=%2Ft%2Fsarahs-shop%2Faudits" {
+		t.Errorf("Location=%q want /login?next=%%2Ft%%2Fsarahs-shop%%2Faudits", loc)
+	}
+}
+
+func TestRequireUser_NoCookie_APIClientGets401(t *testing.T) {
+	t.Parallel()
+	cm, store := newCookieAndStore(t)
+	users := &fakeUserLookup{users: map[uuid.UUID]auth.User{}}
+	h := RequireUser(cm, store, users)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("handler should not be called")
+		w.WriteHeader(http.StatusOK)
+	}))
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/t/sarahs-shop/audits", nil)
+	r.Header.Set("Accept", "application/json")
+	h.ServeHTTP(w, r)
+	if got := w.Result().StatusCode; got != http.StatusUnauthorized {
+		t.Errorf("status=%d want 401", got)
+	}
+}
+
+func TestRequireUser_NoCookie_PostStays401(t *testing.T) {
+	t.Parallel()
+	cm, store := newCookieAndStore(t)
+	users := &fakeUserLookup{users: map[uuid.UUID]auth.User{}}
+	h := RequireUser(cm, store, users)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("handler should not be called")
+		w.WriteHeader(http.StatusOK)
+	}))
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/t/sarahs-shop/audits", nil)
+	r.Header.Set("Accept", "text/html")
+	h.ServeHTTP(w, r)
+	if got := w.Result().StatusCode; got != http.StatusUnauthorized {
+		t.Errorf("status=%d want 401 (POST should never auto-redirect)", got)
 	}
 }
 
@@ -116,7 +155,7 @@ func TestRequirePlatformAdmin(t *testing.T) {
 		admins   map[uuid.UUID]bool
 		wantCode int
 	}{
-		{"no-user-in-ctx", context.Background(), nil, http.StatusUnauthorized},
+		{"no-user-in-ctx", context.Background(), nil, http.StatusFound},
 		{"not-admin", auth.WithUser(context.Background(), user), map[uuid.UUID]bool{}, http.StatusForbidden},
 		{"is-admin", auth.WithUser(context.Background(), user), map[uuid.UUID]bool{user.ID: true}, http.StatusOK},
 	}

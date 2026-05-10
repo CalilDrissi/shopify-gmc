@@ -11,10 +11,15 @@
   <link rel="preload" href="/static/fonts/Inter-Medium.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/Inter-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/css/main.css">
+  <script src="/static/js/alpine.js" defer></script>
 </head>
-<body class="l-platform">
+<body class="l-platform" x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
   <header class="l-platform__topbar">
     <div class="l-platform__topbar-inner">
+      <button type="button" class="l-platform__menu-toggle" @click="navOpen = !navOpen" :aria-expanded="navOpen ? 'true' : 'false'" aria-label="Toggle navigation" aria-controls="platform-sidebar">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" x-show="!navOpen"><path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z"/></svg>
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" x-show="navOpen" x-cloak><path fill="currentColor" d="M18.3 5.71 12 12.01l-6.3-6.3-1.42 1.42 6.3 6.3-6.3 6.29 1.42 1.42 6.3-6.3 6.3 6.3 1.41-1.42-6.3-6.29 6.3-6.3z"/></svg>
+      </button>
       <a class="l-platform__brand" href="/admin">{{ template "logo" }}<span>shopifygmc <em>· platform</em></span></a>
       <nav class="l-platform__user">
         <span>{{ if .Admin }}{{ .Admin.Email }}{{ end }}</span>
@@ -25,8 +30,9 @@
     </div>
   </header>
   <div class="l-platform__shell">
-    <aside class="l-platform__sidebar">
-      <nav>
+    <div class="l-platform__scrim" :class="{ 'is-open': navOpen }" @click="navOpen = false" aria-hidden="true"></div>
+    <aside class="l-platform__sidebar" id="platform-sidebar" :class="{ 'is-open': navOpen }">
+      <nav @click="navOpen = false">
         <a href="/admin">Dashboard</a>
         <a href="/admin/tenants">Tenants</a>
         <a href="/admin/users">Users</a>

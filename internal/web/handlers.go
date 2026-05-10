@@ -405,7 +405,24 @@ func (h *Handlers) LoginForm(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, "login", map[string]any{
 		"Title":  "Sign in",
 		"Fields": defaultLoginFields(),
+		"Next":   safeLoginNext(r.URL.Query().Get("next")),
 	})
+}
+
+// safeLoginNext validates a `next=` redirect target so we don't leak open
+// redirects via the login flow. Accepts only same-origin paths starting
+// with a single `/`, and disallows bouncing back to /login or /logout.
+func safeLoginNext(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	if !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") {
+		return ""
+	}
+	if strings.HasPrefix(raw, "/login") || strings.HasPrefix(raw, "/logout") {
+		return ""
+	}
+	return raw
 }
 
 func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
@@ -467,7 +484,12 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	h.LoginLimit.RecordSuccess(ip)
 
-	// Find primary tenant via membership.
+	// Honor a safe `next=` so users land back where they were headed before
+	// the auth bounce. Falls through to the user's primary tenant otherwise.
+	if next := safeLoginNext(r.FormValue("next")); next != "" {
+		http.Redirect(w, r, next, http.StatusFound)
+		return
+	}
 	slug := h.firstSlug(r.Context(), u.ID)
 	if slug == "" {
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -482,6 +504,7 @@ func (h *Handlers) renderLoginInvalid(w http.ResponseWriter, r *http.Request, em
 	h.render(w, r, "login", map[string]any{
 		"Title":  "Sign in",
 		"Fields": f,
+		"Next":   safeLoginNext(r.FormValue("next")),
 		"Flash":  &bannerVars{Variant: "critical", Title: "Sign-in failed", Message: "Invalid email or password."},
 	})
 }

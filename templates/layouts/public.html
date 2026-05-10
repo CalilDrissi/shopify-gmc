@@ -16,16 +16,22 @@
   <header class="l-public__topbar">
     <div class="l-public__topbar-inner">
       <a class="l-public__brand" href="/">{{ template "logo" }}<span>shopifygmc</span></a>
-      <nav class="l-public__nav">
-        <a href="/features">Features</a>
-        <a href="/pricing">Pricing</a>
-        {{ if .User }}
-          <a href="/t/{{ .User.DefaultSlug }}">Dashboard</a>
-        {{ else }}
-          <a href="/login">Sign in</a>
-          <a href="/signup" class="l-public__nav-cta">Sign up</a>
-        {{ end }}
-      </nav>
+      <details class="l-public__menu">
+        <summary class="l-public__menu-toggle" aria-label="Open menu">
+          <svg class="l-public__menu-icon-open" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z"/></svg>
+          <svg class="l-public__menu-icon-close" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M18.3 5.71 12 12.01l-6.3-6.3-1.42 1.42 6.3 6.3-6.3 6.29 1.42 1.42 6.3-6.3 6.3 6.3 1.41-1.42-6.3-6.29 6.3-6.3z"/></svg>
+        </summary>
+        <nav class="l-public__nav">
+          <a href="/features">Features</a>
+          <a href="/pricing">Pricing</a>
+          {{ if .User }}
+            <a href="/t/{{ .User.DefaultSlug }}">Dashboard</a>
+          {{ else }}
+            <a href="/login">Sign in</a>
+            <a href="/signup" class="l-public__nav-cta">Sign up</a>
+          {{ end }}
+        </nav>
+      </details>
     </div>
   </header>
   <main class="l-public__main">
@@ -35,7 +41,7 @@
     {{ template "content" . }}
   </main>
   <footer class="l-public__footer">
-    <span>&copy; gmcauditor</span>
+    <span>&copy; shopifygmc</span>
     <nav>
       <a href="/features">Features</a>
       <a href="/pricing">Pricing</a>

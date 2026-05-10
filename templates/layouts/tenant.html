@@ -14,7 +14,7 @@
   <script src="/static/js/htmx.js" defer></script>
   <script src="/static/js/alpine.js" defer></script>
 </head>
-<body class="l-tenant">
+<body class="l-tenant" x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
   {{ if .Impersonating }}
     <aside class="c-impersonation" role="alert">
       <div class="c-impersonation__body">
@@ -31,6 +31,10 @@
   {{ end }}
   <header class="l-tenant__topbar">
     <div class="l-tenant__topbar-inner">
+      <button type="button" class="l-tenant__menu-toggle" @click="navOpen = !navOpen" :aria-expanded="navOpen ? 'true' : 'false'" aria-label="Toggle navigation" aria-controls="tenant-sidebar">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" x-show="!navOpen"><path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z"/></svg>
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" x-show="navOpen" x-cloak><path fill="currentColor" d="M18.3 5.71 12 12.01l-6.3-6.3-1.42 1.42 6.3 6.3-6.3 6.29 1.42 1.42 6.3-6.3 6.3 6.3 1.41-1.42-6.3-6.29 6.3-6.3z"/></svg>
+      </button>
       <a class="l-tenant__brand" href="/t/{{ .Tenant.Slug }}">{{ template "logo" }}<span>shopifygmc</span></a>
       <div class="l-tenant__switcher">
         {{ template "tenant-switcher" . }}
@@ -47,8 +51,9 @@
     </div>
   </header>
   <div class="l-tenant__shell">
-    <aside class="l-tenant__sidebar">
-      <nav>
+    <div class="l-tenant__scrim" :class="{ 'is-open': navOpen }" @click="navOpen = false" aria-hidden="true"></div>
+    <aside class="l-tenant__sidebar" id="tenant-sidebar" :class="{ 'is-open': navOpen }">
+      <nav @click="navOpen = false">
         <a href="/t/{{ .Tenant.Slug }}">Dashboard</a>
         <a href="/t/{{ .Tenant.Slug }}/stores">Stores</a>
         <a href="/t/{{ .Tenant.Slug }}/audits">Audits</a>
