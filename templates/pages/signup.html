@@ -1,20 +1,158 @@
 {{ define "content" }}
-<article class="c-card c-card--elevated">
-  <div class="c-card__header">
-    <h1 class="c-card__title">Create your workspace</h1>
-    <p class="c-card__subtitle">Free forever. Add a credit card later.</p>
-  </div>
-  <form class="c-card__body" method="post" action="/signup" style="display:flex; flex-direction:column; gap:16px;">
-    {{ template "form-field" .Fields.Name }}
-    {{ template "form-field" .Fields.Email }}
-    {{ template "form-field" .Fields.Workspace }}
-    {{ template "form-field" .Fields.Password }}
-    <button type="submit" class="c-button c-button--filled c-button--full-width">
-      <span class="c-button__label">Create workspace</span>
-    </button>
-    <p style="text-align:center; color:var(--md-sys-color-on-surface-variant);">
-      Already have an account? <a href="/login">Sign in</a>.
+<article class="c-card c-card--elevated signup-card">
+  <header class="signup-card__head">
+    {{- if .Store }}
+    <span class="signup-card__chip">
+      <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/></svg>
+      Auditing <strong>{{ .Store }}</strong>
+    </span>
+    {{- end }}
+    <h1 class="signup-card__title">Create your account</h1>
+    {{- if not .Store }}
+    <p class="signup-card__sub">Free first audit. No credit card.</p>
+    {{- end }}
+
+    <ol class="signup-steps" data-step-bar aria-label="Signup progress">
+      <li class="signup-steps__item is-active" data-step-label="1">
+        <span class="signup-steps__dot" aria-hidden="true">1</span>
+        <span class="signup-steps__name">Email</span>
+      </li>
+      <li class="signup-steps__item" data-step-label="2">
+        <span class="signup-steps__dot" aria-hidden="true">2</span>
+        <span class="signup-steps__name">Name</span>
+      </li>
+      <li class="signup-steps__item" data-step-label="3">
+        <span class="signup-steps__dot" aria-hidden="true">3</span>
+        <span class="signup-steps__name">Password</span>
+      </li>
+    </ol>
+  </header>
+
+  <form class="signup-card__body signup-form" method="post" action="/signup" data-signup-form novalidate>
+    {{- if .Store }}
+    <input type="hidden" name="store" value="{{ .Store }}">
+    {{- end }}
+
+    <div class="signup-step" data-step="1" data-active>
+      {{ template "form-field" .Fields.Email }}
+    </div>
+    <div class="signup-step" data-step="2">
+      {{ template "form-field" .Fields.Name }}
+    </div>
+    <div class="signup-step" data-step="3">
+      {{ template "form-field" .Fields.Password }}
+    </div>
+
+    <div class="signup-form__actions">
+      <button type="button" class="c-button c-button--text signup-form__back" data-prev hidden>
+        <span class="c-button__label">← Back</span>
+      </button>
+      <button type="button" class="c-button c-button--filled c-button--full-width signup-form__next" data-next>
+        <span class="c-button__label">Continue →</span>
+      </button>
+      <button type="submit" class="c-button c-button--filled c-button--full-width signup-form__submit" hidden>
+        <span class="c-button__label">Create account</span>
+      </button>
+    </div>
+
+    <p class="signup-form__signin">
+      Already have an account? <a href="/login">Sign in</a>
     </p>
   </form>
 </article>
+
+<style>
+  .signup-card { max-width: 460px; width: 100%; margin-inline: auto; overflow: hidden; }
+  .signup-card__head { padding: 28px 28px 20px; display: flex; flex-direction: column; gap: 8px; border-bottom: 0; }
+  .signup-card__chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); font-size: 0.75rem; font-weight: 500; }
+  .signup-card__chip strong { font-weight: 600; }
+  .signup-card__title { font-size: 1.5rem; line-height: 1.25; font-weight: 600; margin: 4px 0 0; color: var(--md-sys-color-on-surface); }
+  .signup-card__sub { margin: 0; color: var(--md-sys-color-on-surface-variant); font-size: 0.875rem; }
+
+  .signup-steps { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); position: relative; }
+  .signup-steps::before { content: ""; position: absolute; left: 16px; right: 16px; top: 14px; height: 2px; background: var(--md-sys-color-outline-variant); border-radius: 999px; z-index: 0; }
+  .signup-steps__item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 1; }
+  .signup-steps__dot { width: 28px; height: 28px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); font-size: 0.75rem; font-weight: 600; border: 2px solid var(--md-sys-color-surface-container-low); transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease; }
+  .signup-steps__name { font-size: 0.7rem; color: var(--md-sys-color-on-surface-variant); transition: color 200ms ease; }
+  .signup-steps__item.is-done .signup-steps__dot { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+  .signup-steps__item.is-active .signup-steps__dot { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent); }
+  .signup-steps__item.is-active .signup-steps__name { color: var(--md-sys-color-primary); font-weight: 600; }
+
+  .signup-card__body.signup-form { padding: 20px 28px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .signup-step { display: none; }
+  .signup-step[data-active] { display: block; }
+  .signup-form__actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .signup-form__actions [hidden] { display: none !important; }
+  .signup-form__actions .signup-form__back { flex: 0 0 auto; }
+  .signup-form__actions .signup-form__next,
+  .signup-form__actions .signup-form__submit { flex: 1 1 auto; }
+  .signup-form__signin { text-align: center; color: var(--md-sys-color-on-surface-variant); margin: 0; font-size: 0.875rem; }
+  .signup-form__signin a { color: var(--md-sys-color-primary); text-decoration: none; font-weight: 500; }
+  .signup-form__signin a:hover { text-decoration: underline; }
+</style>
+
+<script>
+(function () {
+  var form = document.querySelector('[data-signup-form]');
+  if (!form) return;
+  var card = form.closest('.signup-card');
+  var steps = form.querySelectorAll('.signup-step');
+  var labels = card.querySelectorAll('[data-step-label]');
+  var btnPrev = form.querySelector('[data-prev]');
+  var btnNext = form.querySelector('[data-next]');
+  var btnSubmit = form.querySelector('button[type="submit"]');
+  var current = 1;
+  var total = steps.length;
+
+  function setHidden(el, hidden) { if (!el) return; if (hidden) el.setAttribute('hidden', ''); else el.removeAttribute('hidden'); }
+
+  function show(n) {
+    current = Math.max(1, Math.min(total, n));
+    steps.forEach(function (s) {
+      var i = parseInt(s.getAttribute('data-step'), 10);
+      if (i === current) s.setAttribute('data-active', '');
+      else s.removeAttribute('data-active');
+    });
+    labels.forEach(function (l) {
+      var i = parseInt(l.getAttribute('data-step-label'), 10);
+      l.classList.toggle('is-active', i === current);
+      l.classList.toggle('is-done', i < current);
+    });
+    setHidden(btnPrev, current === 1);
+    setHidden(btnNext, current === total);
+    setHidden(btnSubmit, current !== total);
+    var active = form.querySelector('.signup-step[data-active] input');
+    if (active) setTimeout(function () { active.focus(); }, 50);
+  }
+
+  function validateCurrent() {
+    var active = form.querySelector('.signup-step[data-active]');
+    if (!active) return false;
+    var input = active.querySelector('input');
+    if (!input) return true;
+    if (!input.checkValidity()) { input.reportValidity(); return false; }
+    return true;
+  }
+
+  form.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-next], [data-prev]');
+    if (!t) return;
+    if (t.hasAttribute('data-next')) {
+      if (!validateCurrent()) return;
+      show(current + 1);
+    } else {
+      show(current - 1);
+    }
+  });
+
+  form.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    if (e.target.tagName !== 'INPUT') return;
+    if (current < total) {
+      e.preventDefault();
+      if (validateCurrent()) show(current + 1);
+    }
+  });
+})();
+</script>
 {{ end }}

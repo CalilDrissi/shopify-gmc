@@ -142,10 +142,9 @@ func (h *Handlers) NotFound(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 type signupFields struct {
-	Name      formField
-	Email     formField
-	Workspace formField
-	Password  formField
+	Email    formField
+	Name     formField
+	Password formField
 }
 
 type formField struct {
@@ -162,18 +161,21 @@ type inputField struct {
 }
 
 func (h *Handlers) SignupForm(w http.ResponseWriter, r *http.Request) {
+	// The marketing hero links here as /signup?store=<url>; pass the value
+	// straight through so the template can stash it in a hidden input.
+	store := strings.TrimSpace(r.URL.Query().Get("store"))
 	h.render(w, r, "signup", map[string]any{
 		"Title":  "Sign up",
 		"Fields": defaultSignupFields(),
+		"Store":  store,
 	})
 }
 
 func defaultSignupFields() signupFields {
 	return signupFields{
-		Name:      formField{Label: "Your name", Input: inputField{Type: "text", Name: "name", ID: "name", Required: true, Autocomplete: "name"}},
-		Email:     formField{Label: "Email", Input: inputField{Type: "email", Name: "email", ID: "email", Required: true, Autocomplete: "email"}},
-		Workspace: formField{Label: "Workspace name", Hint: "Visible to teammates.", Input: inputField{Type: "text", Name: "workspace", ID: "workspace", Required: true}},
-		Password:  formField{Label: "Password", Hint: "Minimum 12 characters.", Input: inputField{Type: "password", Name: "password", ID: "password", Required: true, Autocomplete: "new-password"}},
+		Email:    formField{Label: "Email", Input: inputField{Type: "email", Name: "email", ID: "email", Required: true, Autocomplete: "email"}},
+		Name:     formField{Label: "Your name", Input: inputField{Type: "text", Name: "name", ID: "name", Required: true, Autocomplete: "name"}},
+		Password: formField{Label: "Password", Hint: "Minimum 12 characters.", Input: inputField{Type: "password", Name: "password", ID: "password", Required: true, Autocomplete: "new-password"}},
 	}
 }
 
@@ -184,15 +186,16 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimSpace(r.FormValue("name"))
 	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
-	workspace := strings.TrimSpace(r.FormValue("workspace"))
 	password := r.FormValue("password")
+	// Marketing hero passes the store domain through as ?store=… so we can
+	// derive a sensible workspace name (and later: pre-attach the store).
+	storeURL := strings.TrimSpace(r.FormValue("store"))
 
 	fields := defaultSignupFields()
 	fields.Name.Input.Value = name
 	fields.Email.Input.Value = email
-	fields.Workspace.Input.Value = workspace
 
-	if name == "" || email == "" || workspace == "" || len(password) < 12 {
+	if name == "" || email == "" || len(password) < 12 {
 		if len(password) < 12 {
 			fields.Password.Error = "Password must be at least 12 characters."
 			fields.Password.Input.Invalid = true
@@ -211,7 +214,11 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slug := slugify(workspace)
+	// Auto-derive workspace name + slug — no UI field for it any more.
+	// Priority: store domain (from ?store=) → user's name → email local part.
+	// Slug always gets a 6-char random suffix for uniqueness.
+	workspace := deriveWorkspaceName(storeURL, name, email)
+	slug := slugify(workspace) + "-" + base64.RawURLEncoding.EncodeToString(randBytes(4))
 	rawToken, tokenHash := newToken()
 
 	rc := store.RequestContext{}
@@ -253,10 +260,11 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 			h.render(w, r, "signup", map[string]any{"Title": "Sign up", "Fields": fields})
 			return
 		}
+		// Slug is auto-generated with a 6-char random suffix — collision is
+		// astronomically unlikely. If it ever happens, surface as a generic
+		// retry rather than crashing.
 		if isUniqueViolation(err, "tenants_slug") {
-			fields.Workspace.Error = "Workspace name is taken. Try another."
-			fields.Workspace.Input.Invalid = true
-			h.render(w, r, "signup", map[string]any{"Title": "Sign up", "Fields": fields})
+			h.renderError(w, http.StatusInternalServerError, "Couldn't allocate workspace. Please retry.")
 			return
 		}
 		h.Logger.Error("signup tx", slog.Any("err", err))
@@ -692,6 +700,47 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// deriveWorkspaceName picks a friendly tenant display name from whatever
+// the user gave us. Order: store domain (e.g. "acme.myshopify.com" → "Acme"),
+// user's first name ("Alice" → "Alice's workspace"), then email local part
+// as a last resort.
+func deriveWorkspaceName(storeURL, name, email string) string {
+	if storeURL != "" {
+		// Strip protocol + trailing path.
+		s := strings.TrimSpace(storeURL)
+		s = strings.TrimPrefix(s, "https://")
+		s = strings.TrimPrefix(s, "http://")
+		if i := strings.IndexAny(s, "/?#"); i >= 0 {
+			s = s[:i]
+		}
+		// "acme.myshopify.com" → "acme"; "shop.acme.com" → "acme"
+		parts := strings.Split(s, ".")
+		var label string
+		if len(parts) >= 2 {
+			label = parts[0]
+			if label == "shop" || label == "www" || label == "store" {
+				if len(parts) >= 3 {
+					label = parts[1]
+				}
+			}
+		} else if len(parts) == 1 {
+			label = parts[0]
+		}
+		label = strings.TrimSpace(label)
+		if label != "" {
+			return strings.ToUpper(label[:1]) + label[1:]
+		}
+	}
+	if name != "" {
+		first := strings.Fields(name)[0]
+		return first + "'s workspace"
+	}
+	if i := strings.Index(email, "@"); i > 0 {
+		return email[:i] + "'s workspace"
+	}
+	return "My workspace"
 }
 
 func slugify(s string) string {
