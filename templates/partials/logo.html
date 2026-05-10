@@ -1,0 +1,17 @@
+{{- /*
+  Component: brand mark
+  Renders the squircle + check icon. Sized via the embedding context's
+  font-size (uses 1em). Pair with text wordmark in the layout.
+*/ -}}
+{{ define "logo" -}}
+<svg class="brand-mark" viewBox="0 0 32 32" role="img" aria-hidden="true" width="1.5em" height="1.5em">
+  <defs>
+    <linearGradient id="brand-mark-g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#008060"/>
+      <stop offset="1" stop-color="#005a44"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" ry="8" fill="url(#brand-mark-g)"/>
+  <path d="M9 16.6 13.4 21 23 11.4" fill="none" stroke="#9af5cd" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+{{- end }}

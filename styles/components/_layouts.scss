@@ -28,6 +28,11 @@
     color: var(--md-sys-color-primary);
     text-decoration: none;
     font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: a.$space-2;
+
+    .brand-mark { flex: 0 0 auto; }
   }
 
   &__nav {
@@ -114,6 +119,11 @@
     color: var(--md-sys-color-primary);
     text-decoration: none;
     font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: a.$space-2;
+
+    .brand-mark { flex: 0 0 auto; }
   }
 
   &__switcher {
@@ -198,6 +208,12 @@
     color: var(--md-sys-color-on-error);
     text-decoration: none;
     font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: a.$space-2;
+
+    .brand-mark { flex: 0 0 auto; }
+    em { font-style: normal; font-weight: 400; opacity: 0.75; margin-left: 4px; }
   }
 
   &__user {

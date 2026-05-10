@@ -5,7 +5,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ if .Title }}{{ .Title }} · {{ end }}Platform admin</title>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="alternate icon" type="image/x-icon" href="/favicon.ico">
   <link rel="preload" href="/static/fonts/Inter-Regular.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/Inter-Medium.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/Inter-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
@@ -14,7 +15,7 @@
 <body class="l-platform">
   <header class="l-platform__topbar">
     <div class="l-platform__topbar-inner">
-      <a class="l-platform__brand" href="/admin">gmcauditor · platform</a>
+      <a class="l-platform__brand" href="/admin">{{ template "logo" }}<span>shopifygmc <em>· platform</em></span></a>
       <nav class="l-platform__user">
         <span>{{ if .Admin }}{{ .Admin.Email }}{{ end }}</span>
         <form method="post" action="/admin/logout" style="display:inline;">

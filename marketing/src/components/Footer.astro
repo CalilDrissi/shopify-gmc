@@ -39,10 +39,16 @@ const year = new Date().getFullYear();
   <div class="container-page py-16">
     <div class="grid gap-10 grid-cols-2 min-[880px]:grid-cols-5">
       <div class="col-span-2">
-        <a href="/" class="flex items-center gap-2 font-semibold">
-          <svg viewBox="0 0 24 24" class="w-7 h-7" aria-hidden="true">
-            <path fill="#006d52" d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4Z" />
-            <path fill="#9af5cd" d="m10.5 13 1.7 1.7L16 11l-1.4-1.4-2.4 2.4-1-.7-.7 1.7Z" />
+        <a href="/" class="flex items-center gap-2 font-semibold" aria-label="shopifygmc home">
+          <svg viewBox="0 0 32 32" class="w-7 h-7" aria-hidden="true">
+            <defs>
+              <linearGradient id="footer-mark" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#008060"/>
+                <stop offset="1" stop-color="#005a44"/>
+              </linearGradient>
+            </defs>
+            <rect width="32" height="32" rx="8" ry="8" fill="url(#footer-mark)"/>
+            <path d="M9 16.6 13.4 21 23 11.4" fill="none" stroke="#9af5cd" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           shopifygmc
         </a>
