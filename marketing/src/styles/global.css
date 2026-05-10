@@ -36,8 +36,13 @@
     background: var(--m3-surface);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Belt-and-braces: any future hero/decoration that overflows must not
+       create a horizontal scrollbar. `clip` (not `hidden`) clips painting
+       without establishing a scroll container, so position:sticky still
+       works on descendants. */
+    overflow-x: clip;
   }
-  body { min-height: 100dvh; }
+  body { min-height: 100dvh; overflow-x: clip; }
   /* Sticky topbar offset so anchors don't hide under it */
   :where(section[id]) { scroll-margin-top: 80px; }
   *:focus-visible {

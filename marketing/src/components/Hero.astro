@@ -17,10 +17,10 @@ const products = [
   <div class="container-page">
     <div class="grid gap-12 lg:gap-16 lg:grid-cols-[1.05fr_1fr] items-center">
       <!-- LEFT: copy + form -->
-      <div>
-        <span class="eyebrow">
-          <svg viewBox="0 0 109 124" class="w-4 h-4" aria-hidden="true"><path fill="#95BF47" d="M74.7 14.8c.3-.3-.6-.4-.9-.4-.3 0-7.7-.4-7.7-.4S60 8.5 59.3 7.8c-.7-.7-1.9-.5-2.4-.4-.1 0-1.5.4-3.7 1.1-.3-1-.7-2.3-1.5-3.5C49.7 1 47.3.4 45.1.4 39.6.5 33.8 5.7 28.9 14c-3.7 6.2-6.2 14-7 20.1-6.6 2-11.2 3.4-11.4 3.5-3.3 1-3.4 1.1-3.8 4.2L0 116.4l72 12.4 31.2-7.7c0 .1-28.2-105.9-28.5-106.3Z"/><path fill="#5E8E3E" d="M73.8 14.4c-.4 0-7.7-.4-7.7-.4S60 8.5 59.3 7.8c-.3-.3-.6-.4-.9-.5l-5.4 121.5 31.2-7.7s-9.6-65-9.7-65.5c-.7-3.5-2.6-3.7-3.5-3.8-.7-.1-1.7.1-2.7.4-.6-1.6-1.3-3.5-2.5-5.5-2.4-4.6-7-9.4-12.5-9.4-1.5 0-3 .5-4.4 1.4Z"/></svg>
-          Built for Shopify · From $19/mo · Free first audit
+      <div class="min-w-0">
+        <span class="eyebrow flex-wrap max-w-full">
+          <svg viewBox="0 0 109 124" class="w-4 h-4 shrink-0" aria-hidden="true"><path fill="#95BF47" d="M74.7 14.8c.3-.3-.6-.4-.9-.4-.3 0-7.7-.4-7.7-.4S60 8.5 59.3 7.8c-.7-.7-1.9-.5-2.4-.4-.1 0-1.5.4-3.7 1.1-.3-1-.7-2.3-1.5-3.5C49.7 1 47.3.4 45.1.4 39.6.5 33.8 5.7 28.9 14c-3.7 6.2-6.2 14-7 20.1-6.6 2-11.2 3.4-11.4 3.5-3.3 1-3.4 1.1-3.8 4.2L0 116.4l72 12.4 31.2-7.7c0 .1-28.2-105.9-28.5-106.3Z"/><path fill="#5E8E3E" d="M73.8 14.4c-.4 0-7.7-.4-7.7-.4S60 8.5 59.3 7.8c-.3-.3-.6-.4-.9-.5l-5.4 121.5 31.2-7.7s-9.6-65-9.7-65.5c-.7-3.5-2.6-3.7-3.5-3.8-.7-.1-1.7.1-2.7.4-.6-1.6-1.3-3.5-2.5-5.5-2.4-4.6-7-9.4-12.5-9.4-1.5 0-3 .5-4.4 1.4Z"/></svg>
+          Built for Shopify
         </span>
         <h1 class="display-lg mt-5 text-md-on-surface">
           Stop losing sales to <span class="bg-gradient-to-r from-md-primary to-[#3c6473] bg-clip-text text-transparent">Merchant Center suspensions.</span>
@@ -71,7 +71,7 @@ const products = [
       </div>
 
       <!-- RIGHT: Google SERP mock — your store appears in Shopping results, marked approved -->
-      <div class="lg:translate-y-2">
+      <div class="min-w-0 lg:translate-y-2">
         <MockGoogleSearch products={products} approvedIndex={0} caption="Your products appear in Google Shopping" query="wireless headphones" />
       </div>
     </div>

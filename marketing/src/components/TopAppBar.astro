@@ -7,29 +7,32 @@ const nav = [
 ];
 ---
 <header class="sticky top-0 z-40 backdrop-blur-md bg-md-surface/80 border-b border-md-outline-variant">
-  <div class="container-page flex items-center justify-between gap-4 h-16">
-    <a href="/" class="flex items-center gap-2 font-semibold text-md-on-surface">
-      <svg viewBox="0 0 24 24" class="w-7 h-7" aria-hidden="true">
+  <div class="container-page flex items-center justify-between gap-3 h-16">
+    <a href="/" class="flex items-center gap-2 font-semibold text-md-on-surface min-w-0">
+      <svg viewBox="0 0 24 24" class="w-7 h-7 shrink-0" aria-hidden="true">
         <path fill="#006d52" d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4Z" />
         <path fill="#9af5cd" d="m10.5 13 1.7 1.7L16 11l-1.4-1.4-2.4 2.4-1-.7-.7 1.7Z" />
       </svg>
-      shopifygmc
+      <span class="truncate">shopifygmc</span>
     </a>
     <nav class="hidden md:flex items-center gap-7 body-md text-md-on-surface-variant">
       {nav.map((n) => <a href={n.href} class="hover:text-md-on-surface transition-colors">{n.label}</a>)}
     </nav>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 shrink-0">
       <a href="/login" class="hidden sm:inline-flex btn-text">Sign in</a>
-      <a href="/signup" class="btn-filled">Start free audit</a>
+      <a href="/signup" class="btn-filled px-4 sm:px-6 text-sm sm:text-base whitespace-nowrap">
+        <span class="sm:hidden">Audit free</span>
+        <span class="hidden sm:inline">Start free audit</span>
+      </a>
+      <details class="md:hidden relative">
+        <summary class="list-none cursor-pointer w-10 h-10 flex items-center justify-center -mr-2" aria-label="Open menu">
+          <svg viewBox="0 0 24 24" class="w-6 h-6" aria-hidden="true"><path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z"/></svg>
+        </summary>
+        <div class="fixed left-0 right-0 top-16 bg-md-surface-container-lowest border-b border-md-outline-variant p-6 flex flex-col gap-4 shadow-m3-3">
+          {nav.map((n) => <a href={n.href} class="body-lg">{n.label}</a>)}
+          <a href="/login" class="body-lg">Sign in</a>
+        </div>
+      </details>
     </div>
-    <details class="md:hidden">
-      <summary class="list-none cursor-pointer w-10 h-10 flex items-center justify-center -mr-2" aria-label="Open menu">
-        <svg viewBox="0 0 24 24" class="w-6 h-6" aria-hidden="true"><path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z"/></svg>
-      </summary>
-      <div class="absolute left-0 right-0 top-16 bg-md-surface-container-lowest border-b border-md-outline-variant p-6 flex flex-col gap-4">
-        {nav.map((n) => <a href={n.href} class="body-lg">{n.label}</a>)}
-        <a href="/login" class="body-lg">Sign in</a>
-      </div>
-    </details>
   </div>
 </header>

@@ -26,14 +26,14 @@ const products = [
       <div class="rounded-m3-md overflow-hidden mb-4 aspect-[16/7] bg-md-surface-container">
         <img
           src="https://images.pexels.com/photos/1337753/pexels-photo-1337753.jpeg?auto=compress&cs=tinysrgb&w=1200"
-          alt="hero" loading="lazy" width="800" height="350" class="w-full h-full object-cover"
+          alt="hero" loading="lazy" decoding="async" class="w-full h-full object-cover"
         />
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {products.map((p) => (
           <div class="relative">
             <div class="aspect-square rounded-md bg-md-surface-container overflow-hidden">
-              <img src={p.img} alt={p.title} loading="lazy" width="200" height="200" class="w-full h-full object-cover" />
+              <img src={p.img} alt={p.title} loading="lazy" decoding="async" class="w-full h-full object-cover" />
             </div>
             <div class="text-xs mt-1 line-clamp-1">{p.title}</div>
             <div class="text-sm font-medium">{p.price}</div>
