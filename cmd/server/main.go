@@ -197,6 +197,7 @@ func main() {
 		{Name: "admin-tenants", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-tenants.html"},
 		{Name: "admin-tenant-detail", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-tenant-detail.html"},
 		{Name: "admin-audit-log", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-audit-log.html"},
+		{Name: "admin-billing-events", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-billing-events.html"},
 		{Name: "admin-settings", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-settings.html"},
 		{Name: "admin-gmc", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-gmc.html"},
 		{Name: "admin-mail", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail.html"},
@@ -443,6 +444,7 @@ func main() {
 	mux.HandleFunc("POST /admin/tenants/{id}/impersonate", adminH.ImpersonationStart)
 	mux.HandleFunc("POST /admin/impersonation/stop", adminH.ImpersonationStop)
 	mux.HandleFunc("GET /admin/audit-log", adminH.AuditLogPage)
+	mux.HandleFunc("GET /admin/billing-events", adminH.BillingEventsPage)
 	mux.HandleFunc("GET /admin/gmc", adminH.GMCPage)
 	mux.HandleFunc("GET /admin/mail", adminH.MailPage)
 	mux.HandleFunc("POST /admin/mail/add", adminH.MailAdd)

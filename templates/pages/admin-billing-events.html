@@ -1,0 +1,85 @@
+{{ define "content" }}
+{{- $filter := index .Data "Filter" -}}
+{{- $counts := index .Data "Counts" -}}
+{{- $events := index .Data "Events" -}}
+
+<h1 class="page-title">Billing events</h1>
+
+<article class="c-card c-card--elevated" style="margin-bottom:16px;">
+  <div class="c-card__body" style="display:flex; gap:24px; flex-wrap:wrap; align-items:center;">
+    <div>
+      <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;">Needs attention</div>
+      <div style="font-size:1.75rem; font-weight:700; color:{{ if gt $counts.NeedsAttn 0 }}#b3261e{{ else }}var(--md-sys-color-on-surface){{ end }};">{{ $counts.NeedsAttn }}</div>
+    </div>
+    <div>
+      <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;">Orphan sales</div>
+      <div style="font-size:1.25rem; font-weight:600;">{{ $counts.OrphanSales }}</div>
+    </div>
+    <div>
+      <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;">Failed signature</div>
+      <div style="font-size:1.25rem; font-weight:600;">{{ $counts.FailedSig }}</div>
+    </div>
+    <div>
+      <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;">Errored</div>
+      <div style="font-size:1.25rem; font-weight:600;">{{ $counts.ErroredEvents }}</div>
+    </div>
+    <div style="margin-left:auto;">
+      <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;">Total events</div>
+      <div style="font-size:1.25rem; font-weight:600;">{{ $counts.Total }}</div>
+    </div>
+  </div>
+</article>
+
+<div style="display:flex; gap:8px; margin-bottom:12px;">
+  {{- if eq $filter "all" }}
+  <a href="/admin/billing-events" class="c-button c-button--outlined"><span class="c-button__label">Needs attention</span></a>
+  <a href="/admin/billing-events?filter=all" class="c-button c-button--filled"><span class="c-button__label">All events</span></a>
+  {{- else }}
+  <a href="/admin/billing-events" class="c-button c-button--filled"><span class="c-button__label">Needs attention</span></a>
+  <a href="/admin/billing-events?filter=all" class="c-button c-button--outlined"><span class="c-button__label">All events</span></a>
+  {{- end }}
+</div>
+
+<article class="c-card c-card--outlined">
+  <div class="c-card__body">
+    {{- if not $events }}
+    <p style="color:var(--md-sys-color-on-surface-variant); margin:0;">No events match the current filter. {{ if ne $filter "all" }}<a href="/admin/billing-events?filter=all">Show all recent events</a>.{{ end }}</p>
+    {{- else }}
+    <table style="width:100%; border-collapse:collapse; font-size:0.8125rem;">
+      <thead>
+        <tr style="text-align:left; color:var(--md-sys-color-on-surface-variant);">
+          <th style="padding:8px 0;">Received</th>
+          <th style="padding:8px 0;">Type</th>
+          <th style="padding:8px 0;">Product</th>
+          <th style="padding:8px 0;">Sale</th>
+          <th style="padding:8px 0;">Tenant</th>
+          <th style="padding:8px 0;">Sig</th>
+          <th style="padding:8px 0;">Processed</th>
+          <th style="padding:8px 0;">Error</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{- range $events }}
+        <tr style="border-top:1px solid var(--md-sys-color-outline-variant); {{ if .ErrorMessage }}background:#fceef0;{{ end }}">
+          <td style="padding:8px 6px 8px 0; white-space:nowrap;">{{ .ReceivedAt.Format "Jan 2 15:04" }}</td>
+          <td style="padding:8px 6px;"><code>{{ .EventType }}</code></td>
+          <td style="padding:8px 6px;">{{ if .ProductID }}<code>{{ deref .ProductID }}</code>{{ else }}—{{ end }}</td>
+          <td style="padding:8px 6px; font-family:monospace; font-size:0.75rem;">{{ if .SaleID }}{{ deref .SaleID }}{{ else }}—{{ end }}</td>
+          <td style="padding:8px 6px;">
+            {{- if .TenantID -}}
+              <a href="/admin/tenants/{{ .TenantID }}" style="color:var(--md-sys-color-primary);"><code>{{ printf "%s" .TenantID }}</code></a>
+            {{- else -}}
+              <span style="color:#b3261e; font-weight:600;">none</span>
+            {{- end -}}
+          </td>
+          <td style="padding:8px 6px;">{{ if .SignatureOK }}<span style="color:#1b873f;">✓</span>{{ else }}<span style="color:#b3261e; font-weight:600;">✗</span>{{ end }}</td>
+          <td style="padding:8px 6px;">{{ if .ProcessedAt }}<span style="color:#1b873f;">✓</span>{{ else }}<span style="color:var(--md-sys-color-on-surface-variant);">—</span>{{ end }}</td>
+          <td style="padding:8px 6px; color:#b3261e; max-width:340px;">{{ if .ErrorMessage }}{{ deref .ErrorMessage }}{{ end }}</td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+    {{- end }}
+  </div>
+</article>
+{{ end }}

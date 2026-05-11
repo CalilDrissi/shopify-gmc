@@ -452,6 +452,88 @@ func (h *AdminHandlers) notifyImpersonationStart(adminEmail string, tenantID uui
 // Audit log + Settings
 // ============================================================================
 
+// BillingEventsPage shows recent Gumroad webhook events with focus on
+// rows the operator may need to act on: signature failures, dispatcher
+// errors, and anonymous sales (no tenant_id). Visible at
+// /admin/billing-events. The query bias is "needs-attention first" so a
+// silent failure can't hide in a wall of successful sales.
+func (h *AdminHandlers) BillingEventsPage(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	filter := r.URL.Query().Get("filter")
+	where := `WHERE (error_message IS NOT NULL OR (tenant_id IS NULL AND event_type NOT IN ('ping','')))`
+	if filter == "all" {
+		where = ""
+	}
+	pool := h.Pool
+	rows, err := pool.Query(r.Context(), `
+		SELECT id, event_type, sale_id, tenant_id, product_id,
+		       signature_ok, processed_at, error_message, received_at
+		FROM gumroad_webhook_events
+		`+where+`
+		ORDER BY received_at DESC
+		LIMIT 200
+	`)
+	if err != nil {
+		http.Error(w, "query: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	type entry struct {
+		ID           uuid.UUID
+		EventType    string
+		SaleID       *string
+		TenantID     *uuid.UUID
+		ProductID    *string
+		SignatureOK  bool
+		ProcessedAt  *time.Time
+		ErrorMessage *string
+		ReceivedAt   time.Time
+	}
+	var list []entry
+	for rows.Next() {
+		var e entry
+		if err := rows.Scan(&e.ID, &e.EventType, &e.SaleID, &e.TenantID, &e.ProductID,
+			&e.SignatureOK, &e.ProcessedAt, &e.ErrorMessage, &e.ReceivedAt); err != nil {
+			continue
+		}
+		list = append(list, e)
+	}
+
+	// Counts for the header summary.
+	type counts struct {
+		Total         int
+		NeedsAttn     int
+		OrphanSales   int
+		FailedSig     int
+		ErroredEvents int
+	}
+	var c counts
+	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM gumroad_webhook_events`).Scan(&c.Total)
+	_ = pool.QueryRow(r.Context(), `
+		SELECT count(*) FROM gumroad_webhook_events
+		WHERE error_message IS NOT NULL
+		   OR (tenant_id IS NULL AND event_type NOT IN ('ping',''))
+	`).Scan(&c.NeedsAttn)
+	_ = pool.QueryRow(r.Context(), `
+		SELECT count(*) FROM gumroad_webhook_events
+		WHERE tenant_id IS NULL AND event_type NOT IN ('ping','')
+	`).Scan(&c.OrphanSales)
+	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM gumroad_webhook_events WHERE signature_ok = false`).Scan(&c.FailedSig)
+	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM gumroad_webhook_events WHERE error_message IS NOT NULL`).Scan(&c.ErroredEvents)
+
+	d.Title = "Billing events"
+	d.Data = map[string]any{
+		"Events": list,
+		"Counts": c,
+		"Filter": filter,
+	}
+	h.renderAdmin(w, r, "admin-billing-events", *d)
+}
+
 func (h *AdminHandlers) AuditLogPage(w http.ResponseWriter, r *http.Request) {
 	d := h.adminCtx(r)
 	if d == nil {
