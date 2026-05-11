@@ -440,6 +440,7 @@ func main() {
 	mux.HandleFunc("GET /admin/tenants", adminH.TenantsList)
 	mux.HandleFunc("GET /admin/tenants/{id}", adminH.TenantDetail)
 	mux.HandleFunc("POST /admin/tenants/{id}/suspend", adminH.TenantSuspend)
+	mux.HandleFunc("POST /admin/tenants/{id}/set-plan", adminH.TenantSetPlan)
 	mux.HandleFunc("POST /admin/tenants/{id}/unsuspend", adminH.TenantUnsuspend)
 	mux.HandleFunc("POST /admin/tenants/{id}/impersonate", adminH.ImpersonationStart)
 	mux.HandleFunc("POST /admin/impersonation/stop", adminH.ImpersonationStop)

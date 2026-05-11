@@ -60,6 +60,36 @@
   </div>
 </article>
 
+{{- if and $.Admin (eq $.Admin.Role "super") }}
+<article class="c-card c-card--elevated" style="border-left:4px solid var(--md-sys-color-tertiary, #7d5260);">
+  <div class="c-card__header">
+    <h3 class="c-card__title">Set plan (manual override)</h3>
+    <p class="c-card__subtitle">Super-admin only. Skips Gumroad. Use for testing or emergency support — every change is audit-logged with old/new plan + reason.</p>
+  </div>
+  <form class="c-card__body" method="post" action="/admin/tenants/{{ .Tenant.ID }}/set-plan" style="display:grid; grid-template-columns:1fr 1fr auto; gap:12px; align-items:end;">
+    <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}">
+    <div class="c-form-field">
+      <label class="c-form-field__label" for="set-plan">New plan</label>
+      <select id="set-plan" name="plan" class="c-input" required>
+        <option value="free"        {{ if eq (printf "%v" .Tenant.Plan) "free" }}selected{{ end }}>free</option>
+        <option value="starter"     {{ if eq (printf "%v" .Tenant.Plan) "starter" }}selected{{ end }}>starter ($12 — same as pro)</option>
+        <option value="pro"         {{ if eq (printf "%v" .Tenant.Plan) "pro" }}selected{{ end }}>pro (legacy alias of starter)</option>
+        <option value="growth"      {{ if eq (printf "%v" .Tenant.Plan) "growth" }}selected{{ end }}>growth ($39)</option>
+        <option value="agency"      {{ if eq (printf "%v" .Tenant.Plan) "agency" }}selected{{ end }}>agency ($199)</option>
+        <option value="enterprise"  {{ if eq (printf "%v" .Tenant.Plan) "enterprise" }}selected{{ end }}>enterprise (legacy)</option>
+      </select>
+    </div>
+    <div class="c-form-field">
+      <label class="c-form-field__label" for="set-plan-reason">Reason</label>
+      <input id="set-plan-reason" class="c-input c-input--text" type="text" name="reason" required placeholder="Manual test / support ticket #123">
+    </div>
+    <button type="submit" class="c-button c-button--filled">
+      <span class="c-button__label">Apply plan</span>
+    </button>
+  </form>
+</article>
+{{- end }}
+
 <article class="c-card c-card--outlined">
   <div class="c-card__header"><h3 class="c-card__title">Status</h3></div>
   <div class="c-card__body" style="display:flex; gap:8px;">

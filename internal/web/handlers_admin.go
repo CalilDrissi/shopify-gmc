@@ -255,6 +255,97 @@ func (h *AdminHandlers) TenantDetail(w http.ResponseWriter, r *http.Request) {
 	h.renderAdmin(w, r, "admin-tenant-detail", *d)
 }
 
+// validPlanTiers is the whitelist a super-admin can flip a tenant to via
+// the manual override form. Order matches the enum + the in-app plan
+// hierarchy. Keep in sync with migrations/000002_enums.up.sql + 000022.
+var validPlanTiers = map[string]bool{
+	"free":       true,
+	"pro":        true,
+	"starter":    true,
+	"growth":     true,
+	"agency":     true,
+	"enterprise": true,
+}
+
+// TenantSetPlan flips a tenant's plan to the requested tier without
+// going through Gumroad. Intended for testing and manual support cases
+// (e.g. a paying customer needs an emergency tier bump while we sort
+// out a webhook glitch). Restricted to super-admins. The action is
+// audit-logged with both old and new plan so the operator's intent is
+// traceable.
+//
+// Clears pending_plan/pending_plan_at because a manual override
+// supersedes whatever Gumroad had scheduled.
+//
+// plan_renews_at: set to now()+1 month for paid tiers so plan-limit
+// checks treat the tenant as having an active subscription; cleared
+// when downgrading to free.
+func (h *AdminHandlers) TenantSetPlan(w http.ResponseWriter, r *http.Request) {
+	d := h.adminCtx(r)
+	if d == nil {
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		return
+	}
+	// Hard gate: super-admins only.
+	if d.Admin.Role != "super" {
+		http.Error(w, "forbidden: super-admin only", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return
+	}
+	newPlan := r.FormValue("plan")
+	if !validPlanTiers[newPlan] {
+		http.Error(w, "invalid plan; expected one of free/pro/starter/growth/agency/enterprise", http.StatusBadRequest)
+		return
+	}
+	// Optional reason — recorded in audit log so future-you can remember why.
+	reason := r.FormValue("reason")
+
+	pool := h.Pool
+	var oldPlan string
+	if err := pool.QueryRow(r.Context(), `SELECT plan::text FROM tenants WHERE id=$1`, id).Scan(&oldPlan); err != nil {
+		http.Error(w, "tenant: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// renews_at: paid tiers get +1 month; free clears it.
+	var sql string
+	if newPlan == "free" {
+		sql = `UPDATE tenants
+		         SET plan = $2::plan_tier,
+		             plan_renews_at = NULL,
+		             pending_plan = NULL,
+		             pending_plan_at = NULL,
+		             updated_at = now()
+		         WHERE id = $1`
+	} else {
+		sql = `UPDATE tenants
+		         SET plan = $2::plan_tier,
+		             plan_renews_at = now() + interval '1 month',
+		             pending_plan = NULL,
+		             pending_plan_at = NULL,
+		             updated_at = now()
+		         WHERE id = $1`
+	}
+	if _, err := pool.Exec(r.Context(), sql, id, newPlan); err != nil {
+		http.Error(w, "set plan: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	h.recordAdminAudit(r, d.Admin.UserID, "tenant_set_plan", "tenant", id.String(), map[string]any{
+		"from":   oldPlan,
+		"to":     newPlan,
+		"reason": reason,
+	})
+	http.Redirect(w, r, "/admin/tenants/"+id.String(), http.StatusFound)
+}
+
 func (h *AdminHandlers) TenantSuspend(w http.ResponseWriter, r *http.Request) {
 	d := h.adminCtx(r)
 	if d == nil {
