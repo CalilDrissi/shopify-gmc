@@ -149,7 +149,16 @@ func (h *Handlers) StoreNewForm(w http.ResponseWriter, r *http.Request) {
 	d := h.buildTenantData(r)
 	limit, current, atLimit, _ := CheckStoreLimit(r.Context(), h.Pool, d.Tenant.ID, string(d.Tenant.Plan))
 	if atLimit {
-		h.renderPlanLimit(w, r, d, limit, current)
+		// Reuse the canonical plan-limit renderer so the user sees the
+		// real plan name + a specific "X stores; you've already added Y"
+		// message — not the broken stub that used a different key shape.
+		h.RenderPlanLimit(w, r, &PlanLimitError{
+			Resource: ResStores,
+			Plan:     string(d.Tenant.Plan),
+			Limit:    limit,
+			Current:  current,
+			Message:  fmt.Sprintf("Your plan includes %d store%s; you've already added %d.", limit, plural(limit), current),
+		})
 		return
 	}
 	d.Title = "Add a store"
@@ -224,17 +233,6 @@ func (h *Handlers) renderStoreNewWithError(w http.ResponseWriter, r *http.Reques
 		},
 	}
 	h.renderTenant(w, r, "store-new", d)
-}
-
-func (h *Handlers) renderPlanLimit(w http.ResponseWriter, r *http.Request, d tenantPageData, limit, current int) {
-	w.WriteHeader(http.StatusPaymentRequired)
-	d.Title = "Plan limit reached"
-	d.Data = map[string]any{
-		"Limit":    limit,
-		"Current":  current,
-		"PlanName": d.Tenant.Plan,
-	}
-	h.renderTenant(w, r, "plan-limit", d)
 }
 
 // ----------------------------------------------------------------------------

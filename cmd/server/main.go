@@ -109,8 +109,10 @@ func main() {
 		// toFloat converts an int to a float64 so price templates can do
 		// "{{ printf "%.0f" (toFloat .PriceCents) }}" to render dollars.
 		"toFloat": func(i int) float64 { return float64(i) / 100 },
-		"upper":   func(s string) string { return strings.ToUpper(s) },
-		"trim":    func(s string) string { return strings.TrimSpace(s) },
+		// upper/trim accept `any` so named string types (e.g. billing.ProductKind)
+		// pipe through without the template engine refusing on type mismatch.
+		"upper": func(v any) string { return strings.ToUpper(fmt.Sprintf("%v", v)) },
+		"trim":  func(v any) string { return strings.TrimSpace(fmt.Sprintf("%v", v)) },
 		// Tiny arithmetic helpers used by the score gauge.
 		"sub":   func(a, b int) int { return a - b },
 		"mul":   func(a int, b float64) float64 { return float64(a) * b },
