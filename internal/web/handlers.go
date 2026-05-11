@@ -133,6 +133,38 @@ func (h *Handlers) Features(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, "features", map[string]any{"Title": "Features"})
 }
 
+func (h *Handlers) Privacy(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, "privacy", map[string]any{"Title": "Privacy Policy"})
+}
+
+func (h *Handlers) Terms(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, "terms", map[string]any{"Title": "Terms of Service"})
+}
+
+func (h *Handlers) Contact(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, "contact", map[string]any{"Title": "Contact"})
+}
+
+func (h *Handlers) About(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, "about", map[string]any{"Title": "About"})
+}
+
+func (h *Handlers) Changelog(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, "changelog", map[string]any{"Title": "Changelog"})
+}
+
+func (h *Handlers) Guides(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, "guides", map[string]any{"Title": "Guides"})
+}
+
+func (h *Handlers) Docs(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, "docs", map[string]any{"Title": "Documentation"})
+}
+
+func (h *Handlers) Status(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, "status", map[string]any{"Title": "Status"})
+}
+
 func (h *Handlers) NotFound(w http.ResponseWriter, r *http.Request) {
 	h.renderError(w, http.StatusNotFound, "We couldn't find that page.")
 }

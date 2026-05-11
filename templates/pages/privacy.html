@@ -1,0 +1,99 @@
+{{ define "content" }}
+<article class="c-card c-card--outlined">
+  <div class="c-card__header">
+    <h1 class="c-card__title">Privacy Policy</h1>
+    <p class="c-card__subtitle">Last updated 11 May 2026</p>
+  </div>
+  <div class="c-card__body" style="display:flex; flex-direction:column; gap:20px; line-height:1.55;">
+
+    <p>shopifygmc ("we", "our") operates the SaaS at <a href="https://shopifygmc.com">shopifygmc.com</a>. This page explains what data we collect, why, how long we keep it, and who else sees it.</p>
+
+    <section>
+      <h2 style="margin:0 0 8px;">1. What we collect</h2>
+      <ul style="margin:0; padding-left:20px;">
+        <li><strong>Account</strong>: email, name, hashed password, the workspace ("tenant") you create.</li>
+        <li><strong>Stores you connect</strong>: Shopify domain, public store metadata, optionally a Google Merchant Center OAuth refresh token (encrypted at rest with AES-GCM).</li>
+        <li><strong>Audit results</strong>: product feed snapshots, compliance findings, AI-suggested fixes, score history.</li>
+        <li><strong>Billing</strong>: Gumroad sends us a sale ID, license key, product permalink, buyer email, and amount on every purchase/refund webhook. We do <strong>not</strong> store credit-card numbers — those live with Gumroad.</li>
+        <li><strong>Operational logs</strong>: IP address, user-agent, and request paths for the last 30 days, used for rate-limiting and abuse detection.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 8px;">2. How we use it</h2>
+      <ul style="margin:0; padding-left:20px;">
+        <li>Run the audits and monitoring you asked for.</li>
+        <li>Send transactional email: verify-email, password reset, audit alerts, billing receipts.</li>
+        <li>Apply plan limits and bill you correctly.</li>
+        <li>Investigate abuse or security incidents.</li>
+      </ul>
+      <p style="margin:8px 0 0;">We do <strong>not</strong> use your data for advertising, profiling beyond plan-limit metering, or sale to third parties.</p>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 8px;">3. Third parties we share with</h2>
+      <ul style="margin:0; padding-left:20px;">
+        <li><strong>Gumroad</strong> — processes all payments. Their <a href="https://gumroad.com/privacy" target="_blank" rel="noopener">privacy policy</a> governs the checkout overlay.</li>
+        <li><strong>Google Merchant Center / Google OAuth</strong> — when you connect a store, we exchange read-only API calls to fetch your account warnings and product diagnostics.</li>
+        <li><strong>Shopify</strong> — we hit your store's public endpoints (product feed, robots.txt, sitemap) the same way a search-engine crawler would.</li>
+        <li><strong>AI provider</strong> — to generate fix suggestions for an issue we send the product title, description, and the specific violation. We do <strong>not</strong> send your email, account ID, or any data that would identify you. The provider does not retain prompts for training.</li>
+        <li><strong>Email delivery</strong> — outbound mail is sent directly from our own server (signed with DKIM); no third-party relay is in the path today.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 8px;">4. How long we keep it</h2>
+      <ul style="margin:0; padding-left:20px;">
+        <li>Account + audit history: until you delete your workspace, or 12 months after the last subscription ends — whichever comes first.</li>
+        <li>Webhook events + billing records: 7 years (tax / accounting requirement).</li>
+        <li>Operational logs: 30 days.</li>
+        <li>Encrypted OAuth tokens: deleted the moment you disconnect a store.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 8px;">5. Your rights</h2>
+      <p style="margin:0;">Under GDPR (EU/UK) and CCPA (California), you can ask us to:</p>
+      <ul style="margin:8px 0 0; padding-left:20px;">
+        <li>Export a copy of your data in machine-readable form.</li>
+        <li>Correct anything that's wrong.</li>
+        <li>Delete your workspace and all associated data (keeping only what tax law requires).</li>
+        <li>Object to or restrict any processing you don't agree with.</li>
+      </ul>
+      <p style="margin:8px 0 0;">Email <a href="mailto:privacy@shopifygmc.com">privacy@shopifygmc.com</a> with the request. We respond within 30 days. If we can't satisfy you, you can file a complaint with your local data-protection authority.</p>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 8px;">6. Security</h2>
+      <ul style="margin:0; padding-left:20px;">
+        <li>HTTPS-only across the whole product (HSTS preload).</li>
+        <li>Passwords stored with Argon2id; OAuth tokens encrypted at rest.</li>
+        <li>Sessions are signed and HTTPS-only.</li>
+        <li>Postgres is on a private interface; no direct external access.</li>
+      </ul>
+      <p style="margin:8px 0 0;">If you discover a vulnerability, please email <a href="mailto:security@shopifygmc.com">security@shopifygmc.com</a> before disclosing publicly.</p>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 8px;">7. Cookies</h2>
+      <p style="margin:0;">We set one essential cookie — your session token. We don't run analytics or ad cookies. If we ever add them, this page will be updated and we'll ask first.</p>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 8px;">8. Children</h2>
+      <p style="margin:0;">shopifygmc is a B2B SaaS for Shopify merchants. It isn't intended for anyone under 16. We don't knowingly collect data from children; if you believe we have, email us and we'll delete it.</p>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 8px;">9. Changes to this policy</h2>
+      <p style="margin:0;">Material changes are emailed to all active users 14 days before they take effect. Minor wording fixes are listed at the top of this page with a new "Last updated" date.</p>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 8px;">10. Contact</h2>
+      <p style="margin:0;">shopifygmc, operated by SmartShopAutomation. Reach us at <a href="mailto:privacy@shopifygmc.com">privacy@shopifygmc.com</a>.</p>
+    </section>
+
+  </div>
+</article>
+{{ end }}

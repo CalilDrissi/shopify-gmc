@@ -1,0 +1,50 @@
+{{ define "content" }}
+<article class="c-card c-card--outlined">
+  <div class="c-card__header">
+    <h1 class="c-card__title">Changelog</h1>
+    <p class="c-card__subtitle">What's shipped, newest first.</p>
+  </div>
+  <div class="c-card__body" style="display:flex; flex-direction:column; gap:20px; line-height:1.55;">
+
+    <section>
+      <h2 style="margin:0 0 4px;">11 May 2026 — Production launch</h2>
+      <ul style="margin:0; padding-left:20px;">
+        <li>Gumroad billing live across four products: Starter $12/mo, Growth $39/mo, Agency $199/mo, Rescue Audit $29 one-time.</li>
+        <li>Payment overlay opens in-place on /pricing — no redirect to checkout.</li>
+        <li>Webhook handler hardened: refund of a one-time product no longer downgrades active subscriptions; unknown product or anonymous purchase notifies the operator for manual reconciliation.</li>
+        <li>Privacy policy, Terms of service, Contact pages live.</li>
+        <li>Brand cleanup: all user-facing copy now says "shopifygmc" instead of the old internal "gmcauditor".</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 4px;">10 May 2026 — Mobile + responsive</h2>
+      <ul style="margin:0; padding-left:20px;">
+        <li>Every app page (login, signup, dashboard, audits, stores, members, billing, account) collapses cleanly down to 320px.</li>
+        <li>Sidebar becomes an off-canvas drawer with hamburger toggle on tenant and platform layouts.</li>
+        <li>Marketing site's horizontal-scroll bug fixed; product overlay images, eyebrow chip, and SERP mock all bound by viewport.</li>
+        <li>Auth middleware now redirects browser GETs to <code>/login?next=…</code> instead of returning a bare 401.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 4px;">9 May 2026 — Brand mark + favicon</h2>
+      <ul style="margin:0; padding-left:20px;">
+        <li>New logo: rounded green squircle with a check mark, gradient from Shopify green to deep teal.</li>
+        <li>SVG favicon + multi-size ICO across app + marketing site.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 style="margin:0 0 4px;">8 May 2026 — Multi-step signup</h2>
+      <ul style="margin:0; padding-left:20px;">
+        <li>Signup form split into email → name → password steps, with a progress indicator.</li>
+        <li>Workspace name dropped from the form; we generate it from the user's name.</li>
+      </ul>
+    </section>
+
+    <p style="color:var(--md-sys-color-on-surface-variant); margin:0;">Want to be told when something ships? Coming soon — for now <a href="mailto:support@shopifygmc.com">email support</a> and we'll add you to the announcement list.</p>
+
+  </div>
+</article>
+{{ end }}

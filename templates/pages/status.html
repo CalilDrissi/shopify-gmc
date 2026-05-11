@@ -1,0 +1,23 @@
+{{ define "content" }}
+<article class="c-card c-card--outlined">
+  <div class="c-card__header">
+    <h1 class="c-card__title">Service status</h1>
+  </div>
+  <div class="c-card__body" style="display:flex; flex-direction:column; gap:16px; line-height:1.55;">
+
+    <p style="display:inline-flex; align-items:center; gap:8px; margin:0;">
+      <span style="display:inline-block; width:10px; height:10px; border-radius:9999px; background:#1b873f;"></span>
+      <strong>All systems operational.</strong>
+    </p>
+
+    <p style="margin:0;">If shopifygmc.com is responding to this page, the web tier is live. The audit worker and Postgres are on the same host; we run a single-region single-instance setup. Production-grade multi-region failover is on the roadmap once we have customers it matters to.</p>
+
+    <h2 style="margin:8px 0 0;">Incident history</h2>
+    <p style="margin:0;">No public incidents reported yet. We'll log incidents here with timestamps and a brief postmortem once we're past launch.</p>
+
+    <h2 style="margin:8px 0 0;">Monitoring</h2>
+    <p style="margin:0;">Internal health endpoint: <code>/healthz</code> (liveness) and <code>/readyz</code> (DB-reachable). Off-box uptime monitoring with paging is being set up; until that lands, please <a href="mailto:ops@shopifygmc.com">email ops</a> if you see the site unreachable.</p>
+
+  </div>
+</article>
+{{ end }}

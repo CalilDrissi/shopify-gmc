@@ -163,6 +163,14 @@ func main() {
 		{Name: "landing", Layout: "templates/layouts/public.html", Template: "templates/pages/landing.html"},
 		{Name: "pricing", Layout: "templates/layouts/public.html", Template: "templates/pages/pricing.html"},
 		{Name: "features", Layout: "templates/layouts/public.html", Template: "templates/pages/features.html"},
+		{Name: "privacy", Layout: "templates/layouts/public.html", Template: "templates/pages/privacy.html"},
+		{Name: "terms", Layout: "templates/layouts/public.html", Template: "templates/pages/terms.html"},
+		{Name: "contact", Layout: "templates/layouts/public.html", Template: "templates/pages/contact.html"},
+		{Name: "about", Layout: "templates/layouts/public.html", Template: "templates/pages/about.html"},
+		{Name: "changelog", Layout: "templates/layouts/public.html", Template: "templates/pages/changelog.html"},
+		{Name: "guides", Layout: "templates/layouts/public.html", Template: "templates/pages/guides.html"},
+		{Name: "docs", Layout: "templates/layouts/public.html", Template: "templates/pages/docs.html"},
+		{Name: "status", Layout: "templates/layouts/public.html", Template: "templates/pages/status.html"},
 		{Name: "signup", Layout: "templates/layouts/public.html", Template: "templates/pages/signup.html"},
 		{Name: "login", Layout: "templates/layouts/public.html", Template: "templates/pages/login.html"},
 		{Name: "verify-email", Layout: "templates/layouts/public.html", Template: "templates/pages/verify-email.html"},
@@ -313,6 +321,14 @@ func main() {
 	mux.HandleFunc("GET /pricing", h.PricingPage)
 	mux.HandleFunc("POST /webhooks/gumroad", h.GumroadWebhook)
 	mux.HandleFunc("GET /features", h.Features)
+	mux.HandleFunc("GET /privacy", h.Privacy)
+	mux.HandleFunc("GET /terms", h.Terms)
+	mux.HandleFunc("GET /contact", h.Contact)
+	mux.HandleFunc("GET /about", h.About)
+	mux.HandleFunc("GET /changelog", h.Changelog)
+	mux.HandleFunc("GET /guides", h.Guides)
+	mux.HandleFunc("GET /docs", h.Docs)
+	mux.HandleFunc("GET /status", h.Status)
 	mux.HandleFunc("GET /signup", h.SignupForm)
 	mux.HandleFunc("POST /signup", h.Signup)
 	mux.HandleFunc("GET /login", h.LoginForm)
