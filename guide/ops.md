@@ -7,7 +7,6 @@ Daily commands, deploys, and what to do when something breaks.
 ```bash
 curl -s https://shopifygmc.com/healthz   # → "ok"     (process alive)
 curl -s https://shopifygmc.com/readyz    # → "ready"  (DB reachable)
-curl -s https://staging.shopifygmc.com/healthz
 ```
 
 If `/readyz` returns 503, Postgres is unreachable from the app. Jump
@@ -25,25 +24,21 @@ ssh root@62.169.16.57 'journalctl -u gmcauditor-prod-worker -n 100'
 # Mail logs
 ssh root@62.169.16.57 'tail -f /var/log/mail.log'
 
-# Caddy access logs (one per env)
+# Caddy access logs
 ssh root@62.169.16.57 'tail -f /var/log/caddy/prod-access.log'
-ssh root@62.169.16.57 'tail -f /var/log/caddy/staging-access.log'
 ssh root@62.169.16.57 'tail -f /var/log/caddy/webmail-access.log'
 ```
 
-App logs also land on disk at `/var/log/gmcauditor/<env>/<svc>.log`.
+App logs also land on disk at `/var/log/gmcauditor/prod/<svc>.log`.
 
 ## Restarting services
 
 ```bash
-# One service in one env
+# One service
 ssh root@62.169.16.57 'systemctl restart gmcauditor-prod-server'
 
-# All three services in one env (server + worker + scheduler)
+# All three services (server + worker + scheduler)
 ssh root@62.169.16.57 'systemctl restart gmcauditor-prod.target'
-
-# Both envs
-ssh root@62.169.16.57 'systemctl restart gmcauditor-prod.target gmcauditor-staging.target'
 
 # Caddy after a Caddyfile edit
 ssh root@62.169.16.57 'systemctl reload caddy'
@@ -55,16 +50,15 @@ ssh root@62.169.16.57 'systemctl restart postfix dovecot opendkim'
 Each app service has a 30-second graceful drain on SIGTERM — in-flight
 HTTP requests and audit jobs complete before the process exits.
 
-## Editing per-env configuration
+## Editing configuration
 
-Per-env environment files live on the box (not in git, by design):
+The env file lives on the box (not in git, by design):
 
 ```
 /opt/gmcauditor/prod/env/app.env
-/opt/gmcauditor/staging/env/app.env
 ```
 
-After editing, restart the affected env:
+After editing, restart:
 
 ```bash
 ssh root@62.169.16.57 'vi /opt/gmcauditor/prod/env/app.env && systemctl restart gmcauditor-prod.target'
@@ -87,32 +81,24 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/scheduler ./cmd/schedule
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/migrate   ./cmd/migrate
 make build-css
 
-# 2. Stop services so the in-use binary can be replaced
-ssh root@62.169.16.57 'systemctl stop gmcauditor-staging-server gmcauditor-prod-server'
+# 2. Stop the server so the in-use binary can be replaced
+ssh root@62.169.16.57 'systemctl stop gmcauditor-prod-server'
 
-# 3. Push artifacts (both envs at once)
-for env in staging prod; do
-  rsync -az build/      root@62.169.16.57:/opt/gmcauditor/$env/bin/
-  rsync -az static/     root@62.169.16.57:/opt/gmcauditor/$env/static/
-  rsync -az templates/  root@62.169.16.57:/opt/gmcauditor/$env/templates/
-  rsync -az migrations/ root@62.169.16.57:/opt/gmcauditor/$env/migrations/
-done
+# 3. Push artifacts
+rsync -az build/      root@62.169.16.57:/opt/gmcauditor/prod/bin/
+rsync -az static/     root@62.169.16.57:/opt/gmcauditor/prod/static/
+rsync -az templates/  root@62.169.16.57:/opt/gmcauditor/prod/templates/
+rsync -az migrations/ root@62.169.16.57:/opt/gmcauditor/prod/migrations/
 ssh root@62.169.16.57 'chown -R deploy:deploy /opt/gmcauditor'
 
 # 4. Migrate (idempotent — only runs new migrations)
-ssh root@62.169.16.57 '
-  for env in staging prod; do
-    cd /opt/gmcauditor/$env
-    sudo -u deploy bash -c "set -a && source env/app.env && set +a && ./bin/migrate up"
-  done
-'
+ssh root@62.169.16.57 'cd /opt/gmcauditor/prod && sudo -u deploy bash -c "set -a && source env/app.env && set +a && ./bin/migrate up"'
 
 # 5. Restart everything
-ssh root@62.169.16.57 'systemctl restart gmcauditor-staging.target gmcauditor-prod.target'
+ssh root@62.169.16.57 'systemctl restart gmcauditor-prod.target'
 
 # 6. Sanity check
 curl -s -w "\nHTTP %{http_code}\n" https://shopifygmc.com/readyz
-curl -s -w "\nHTTP %{http_code}\n" https://staging.shopifygmc.com/readyz
 ```
 
 The "GitHub Actions auto-deploy" task in [`../TODO.md`](../TODO.md)
@@ -204,11 +190,14 @@ WAL files, large user mailboxes.
 
 ### Backups
 
-**You don't have any yet.** Two options worth picking from:
+Nightly `pg_dump` cron writes prod dumps to
+`/var/backups/gmcauditor/prod/`, keeping 7 days. Restore with:
 
-1. Nightly `pg_dump` cron pushed to Backblaze B2 / S3 (~$1/mo).
-2. Move the database to a managed Postgres provider (Neon,
-   Supabase, RDS, Fly Postgres) and point `DATABASE_URL` at it —
-   they handle PITR automatically.
+```bash
+sudo -u postgres pg_restore --clean --if-exists --no-owner \
+  -d "$DATABASE_URL" /var/backups/gmcauditor/prod/<YYYY-MM-DD_HH-MM>.dump
+```
 
-This is item #5 in [`../TODO.md`](../TODO.md).
+Off-box copy isn't wired yet — a disk failure on the box loses the
+backups too. Item #54 in [`../TODO.md`](../TODO.md) covers wiring an
+off-box destination.

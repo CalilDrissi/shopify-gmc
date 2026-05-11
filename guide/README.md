@@ -15,7 +15,6 @@ read one thing, read the next four.
 ## Quick links
 
 - App (prod): <https://shopifygmc.com>
-- App (staging): <https://staging.shopifygmc.com>
 - Platform admin: <https://shopifygmc.com/admin/login>
 - Webmail: <https://mail.shopifygmc.com>
 - Mail-management UI: <https://shopifygmc.com/admin/mail>
@@ -24,14 +23,13 @@ read one thing, read the next four.
 
 ## What's running
 
-One Ubuntu 24.04 VPS at `62.169.16.57` runs both prod and staging
-side by side, plus the mail stack:
+One Ubuntu 24.04 VPS at `62.169.16.57` runs prod plus the mail stack:
 
 | Layer | Software |
 | --- | --- |
 | Edge / TLS | Caddy (auto Let's Encrypt) |
-| App | Three Go binaries per env: `server`, `worker`, `scheduler` |
-| Data | PostgreSQL 16 (`gmcauditor_prod`, `gmcauditor_staging`) |
+| App | Three Go binaries: `server`, `worker`, `scheduler` |
+| Data | PostgreSQL 16 (`gmcauditor_prod`) |
 | Outbound mail | Postfix + OpenDKIM (DKIM-signs everything) |
 | Inbound mail | Postfix virtual mailboxes → Dovecot LMTP → Maildir |
 | Webmail | Roundcube + PHP-FPM |

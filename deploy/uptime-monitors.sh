@@ -14,10 +14,8 @@
 #       expects body "ok", every 5 minutes
 #   - HTTPS keyword monitor on https://shopifygmc.com/readyz
 #       expects body "ready", every 5 minutes (catches DB outages)
-#   - HTTPS monitor on https://staging.shopifygmc.com/healthz
-#       every 15 minutes (staging gets coarser polling)
 #
-# Free tier: 50 monitors at 5-minute intervals. We use 3.
+# Free tier: 50 monitors at 5-minute intervals. We use 2.
 #
 # Alerts: monitors are attached to ALL existing alert contacts in your
 # account (which UptimeRobot lists with `getAlertContacts`). If you
@@ -88,9 +86,8 @@ upsert_monitor() {
   echo
 }
 
-upsert_monitor "shopifygmc prod healthz"  "https://shopifygmc.com/healthz"           300 "ok"
-upsert_monitor "shopifygmc prod readyz"   "https://shopifygmc.com/readyz"            300 "ready"
-upsert_monitor "shopifygmc staging"       "https://staging.shopifygmc.com/healthz"   900 "ok"
+upsert_monitor "shopifygmc prod healthz"  "https://shopifygmc.com/healthz"  300 "ok"
+upsert_monitor "shopifygmc prod readyz"   "https://shopifygmc.com/readyz"   300 "ready"
 
 echo
 echo "=== 4) Final monitor list ==="

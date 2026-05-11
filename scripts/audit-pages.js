@@ -1,5 +1,5 @@
 // Full Playwright audit of the live deployment — page by page, form by
-// form. Targets staging by default (BASE env var to override). Captures:
+// form. Targets prod by default (BASE env var to override). Captures:
 //
 //   - HTTP status (302 chains followed)
 //   - Page title + presence of expected anchor element
@@ -15,7 +15,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const BASE = process.env.BASE || 'https://staging.shopifygmc.com';
+const BASE = process.env.BASE || 'https://shopifygmc.com';
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'tmp', 'audit');
 const SHOTS = path.join(OUT, 'screenshots');
@@ -181,7 +181,7 @@ async function visit(page, label, url, opts = {}) {
       // Bypass for the rest of the audit
       execSync(
         `ssh -i ${sshKey} -o IdentitiesOnly=yes -o PasswordAuthentication=no -o StrictHostKeyChecking=no ${sshHost} ` +
-        `"sudo -u postgres psql -d gmcauditor_staging -c \\"UPDATE users SET email_verified_at=now() WHERE email='${owner.email}'\\""`,
+        `"sudo -u postgres psql -d gmcauditor_prod -c \\"UPDATE users SET email_verified_at=now() WHERE email='${owner.email}'\\""`,
         { encoding: 'utf8' }
       );
       record('info', 'verify-bypass', 'flipped email_verified_at via DB so the signed-in tour can continue (test-only shortcut)');

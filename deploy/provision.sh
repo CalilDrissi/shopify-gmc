@@ -26,29 +26,26 @@ fi
 # --- App layout ---
 log "creating /opt/gmcauditor layout"
 id deploy &>/dev/null || useradd --system --create-home --home-dir /home/deploy --shell /bin/bash deploy
-for env in staging prod; do
+# Only prod exists today. To add staging back: extend this list, run
+# this script again, then redo the same in deploy/units.sh.
+for env in prod; do
   install -d -o deploy -g deploy /opt/gmcauditor/$env/{bin,env,static,templates,migrations,styles,scripts}
   install -d -o deploy -g deploy /var/log/gmcauditor/$env
 done
 
 # --- Postgres roles + DBs ---
 log "creating postgres roles + databases"
-sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='gmc_staging'" | grep -q 1 \
-  || sudo -u postgres psql -c "CREATE ROLE gmc_staging LOGIN PASSWORD 'STAGING_DB_PW_PLACEHOLDER' CREATEDB"
 sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='gmc_prod'" | grep -q 1 \
   || sudo -u postgres psql -c "CREATE ROLE gmc_prod LOGIN PASSWORD 'PROD_DB_PW_PLACEHOLDER' CREATEDB"
-sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='gmcauditor_staging'" | grep -q 1 \
-  || sudo -u postgres psql -c "CREATE DATABASE gmcauditor_staging OWNER gmc_staging"
 sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='gmcauditor_prod'" | grep -q 1 \
   || sudo -u postgres psql -c "CREATE DATABASE gmcauditor_prod OWNER gmc_prod"
 # Required extension for gen_random_uuid()
-for db in gmcauditor_staging gmcauditor_prod; do
+for db in gmcauditor_prod; do
   sudo -u postgres psql -d $db -c "CREATE EXTENSION IF NOT EXISTS pgcrypto"
   sudo -u postgres psql -d $db -c "CREATE EXTENSION IF NOT EXISTS citext"
 done
 # BYPASSRLS for the app role so it can write across tenants from the worker.
 # RLS still applies for any other role (none currently).
-sudo -u postgres psql -c "ALTER ROLE gmc_staging BYPASSRLS"
 sudo -u postgres psql -c "ALTER ROLE gmc_prod BYPASSRLS"
 
 # --- Firewall ---

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Provision nightly Postgres backups for staging + prod.
+# Provision nightly Postgres backups for prod.
 #
 # Run as root on the prod box. Idempotent — re-running re-installs
 # the helper script and the cron entry without duplicating either.
@@ -7,19 +7,20 @@
 # What it does:
 #   1. Writes /usr/local/bin/gmcauditor-backup-db (the worker script).
 #   2. Drops a /etc/cron.d/gmcauditor-backups entry: 03:00 UTC nightly.
-#   3. Creates /var/backups/gmcauditor/{staging,prod} with mode 0700,
-#      owned by root.
+#   3. Creates /var/backups/gmcauditor/prod with mode 0700, owned by root.
 #   4. Runs the worker once immediately so we have a first dump on disk.
 #
 # Worker behaviour:
-#   - For each env (staging, prod): reads DATABASE_URL out of
-#     /opt/gmcauditor/<env>/env/app.env (the prod/staging-flavoured one,
-#     same source the systemd units use) and runs `pg_dump --format=c
+#   - For each env in ENVS: reads DATABASE_URL out of
+#     /opt/gmcauditor/<env>/env/app.env and runs `pg_dump --format=c
 #     --no-owner --no-privileges` to a date-stamped .dump file.
 #   - Keeps the 7 most-recent dumps per env; older ones get deleted.
 #   - On failure (pg_dump non-zero, disk full, malformed env file) sends
 #     mail to OPERATOR_EMAIL via /usr/sbin/sendmail.
 #   - Logs every run + every error to /var/log/gmcauditor/backups.log.
+#
+# If you spin up a staging env again, add "staging" to the ENVS array
+# in both the outer script + the worker heredoc.
 #
 # Restore (informational, not automated here):
 #   sudo -u deploy pg_restore --clean --if-exists --no-owner \
@@ -32,7 +33,7 @@ LOG_DIR=/var/log/gmcauditor
 WORKER=/usr/local/bin/gmcauditor-backup-db
 CRON=/etc/cron.d/gmcauditor-backups
 RETAIN=7
-ENVS=(staging prod)
+ENVS=(prod)
 
 mkdir -p "$LOG_DIR"
 for env in "${ENVS[@]}"; do
@@ -51,7 +52,7 @@ set -uo pipefail
 BACKUP_ROOT=/var/backups/gmcauditor
 LOG_FILE=/var/log/gmcauditor/backups.log
 RETAIN=7
-ENVS=(staging prod)
+ENVS=(prod)
 NOW=$(date -u +%Y-%m-%d_%H-%M)
 OPERATOR_EMAIL=${OPERATOR_EMAIL:-ops@shopifygmc.com}
 MAIL_FROM=${MAIL_FROM:-noreply@shopifygmc.com}
@@ -126,7 +127,7 @@ chown root:root "$WORKER"
 # Cron: 03:00 UTC daily. CRON runs as root; PATH explicit because cron's
 # default PATH doesn't include pg_dump on some Debian setups.
 cat > "$CRON" <<EOF
-# Nightly Postgres backups for gmcauditor (staging + prod).
+# Nightly Postgres backups for gmcauditor (prod).
 # Managed by deploy/backups.sh — re-run that script to update.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

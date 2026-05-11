@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
-# Install 6 systemd units (server/worker/scheduler × staging/prod) +
+# Install 3 systemd units (server/worker/scheduler for prod) +
 # the per-env Caddyfile, then enable + start everything.
+#
+# To add staging back: extend `for env in prod` below to
+# `for env in staging prod`, restore the staging vhost block in the
+# Caddyfile heredoc, and add the staging units to the enable line.
+#
+# WARNING: re-running this overwrites /etc/caddy/Caddyfile with the
+# heredoc below. If you've made out-of-band changes to the live
+# Caddyfile (path matchers for app routes, additional vhosts), they
+# will be lost. Diff against the live file before running on an
+# already-bootstrapped box.
 set -euo pipefail
 
 write_unit() {
@@ -65,7 +75,7 @@ WantedBy=multi-user.target
 EOF
 }
 
-for env in staging prod; do
+for env in prod; do
   write_unit $env server    ""              "gmcauditor HTTP server"
   write_unit $env worker    "-mode=worker"  "gmcauditor worker"
   write_unit $env scheduler "-mode=scheduler" "gmcauditor scheduler"
@@ -97,27 +107,9 @@ shopifygmc.com, www.shopifygmc.com {
         }
 }
 
-staging.shopifygmc.com {
-        encode gzip
-        reverse_proxy localhost:8081 {
-                header_up X-Forwarded-For {remote_host}
-                header_up X-Forwarded-Proto {scheme}
-                header_up X-Real-IP {remote_host}
-        }
-        log {
-                output file /var/log/caddy/staging-access.log {
-                        roll_size 50mb
-                        roll_keep 7
-                }
-                format json
-        }
-        # Discourage indexing of staging
-        header X-Robots-Tag "noindex, nofollow"
-}
 EOF
 
 systemctl daemon-reload
-systemctl enable --now gmcauditor-staging-server.service gmcauditor-staging-worker.service gmcauditor-staging-scheduler.service
-systemctl enable --now gmcauditor-prod-server.service    gmcauditor-prod-worker.service    gmcauditor-prod-scheduler.service
+systemctl enable --now gmcauditor-prod-server.service gmcauditor-prod-worker.service gmcauditor-prod-scheduler.service
 systemctl reload caddy
 echo "[units] all up"

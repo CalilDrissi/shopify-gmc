@@ -12,7 +12,6 @@ on each).
 | Where | URL |
 | --- | --- |
 | Production | <https://shopifygmc.com/admin/login> |
-| Staging | <https://staging.shopifygmc.com/admin/login> |
 
 **Credentials**: don't live in this repo. They're either in your
 password manager (recommended) or in this chat transcript right now —
@@ -32,7 +31,6 @@ ssh root@62.169.16.57 'sudo -u postgres psql -d gmcauditor_prod -c \
   "UPDATE platform_admins SET totp_secret=NULL, totp_enrolled_at=NULL WHERE role=\"super\""'
 ```
 
-(Same for `gmcauditor_staging`.)
 
 ### Sidebar tour once you're in
 
@@ -74,8 +72,7 @@ and disable password auth — see [`credentials.md`](./credentials.md#server-ssh
 
 Anyone — including you — signs up at:
 
-- <https://shopifygmc.com/signup> for prod
-- <https://staging.shopifygmc.com/signup> for staging
+- <https://shopifygmc.com/signup>
 
 Verification email arrives at your inbox. Click the link, you're in.
 For password reset, use <https://shopifygmc.com/forgot-password>.
