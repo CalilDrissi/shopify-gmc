@@ -1,11 +1,10 @@
 // Package billing wires Gumroad webhooks into the tenant plan model.
 //
-// Five products live in Gumroad:
-//   - GMC_PROD_STARTER  — $19/mo subscription → plan='pro' (= "Starter")
-//   - GMC_PROD_GROWTH   — $49/mo subscription → plan='growth'
+// Four products live in Gumroad:
+//   - GMC_PROD_STARTER  — $12/mo subscription → plan='pro' (= "Starter")
+//   - GMC_PROD_GROWTH   — $39/mo subscription → plan='growth'
 //   - GMC_PROD_AGENCY   — $199/mo subscription → plan='agency'
-//   - GMC_PROD_RESCUE   — $99 one-time charge — triggers a one-shot internal task
-//   - GMC_PROD_DFY      — $499 one-time charge — operator notification
+//   - GMC_PROD_RESCUE   — $29 one-time charge — triggers a one-shot internal task
 //
 // The mapping from Gumroad product_id to one of the above is configured at
 // runtime via env vars (set per environment in Gumroad's dashboard); we
@@ -21,12 +20,11 @@ import (
 type ProductKind string
 
 const (
-	KindStarter   ProductKind = "starter"
-	KindGrowth    ProductKind = "growth"
-	KindAgency    ProductKind = "agency"
-	KindRescue    ProductKind = "rescue"
-	KindDFY       ProductKind = "dfy"
-	KindUnknown   ProductKind = "unknown"
+	KindStarter ProductKind = "starter"
+	KindGrowth  ProductKind = "growth"
+	KindAgency  ProductKind = "agency"
+	KindRescue  ProductKind = "rescue"
+	KindUnknown ProductKind = "unknown"
 )
 
 // Product carries the metadata the webhook handler + billing UI need.
@@ -52,23 +50,21 @@ type Catalog struct {
 }
 
 // LoadCatalog returns the runtime-configured catalog. The expected env keys
-// are GUMROAD_PRODUCT_STARTER / _GROWTH / _AGENCY / _RESCUE / _DFY for the
+// are GUMROAD_PRODUCT_STARTER / _GROWTH / _AGENCY / _RESCUE for the
 // product permalinks (e.g. "gmc-starter") plus optional _URL overrides for
 // the overlay URL.
 func LoadCatalog() Catalog {
 	defaults := []Product{
-		{Kind: KindStarter, Title: "Starter", PlanTier: "pro",     IsRecurring: true, PriceCents: 1900},
-		{Kind: KindGrowth,  Title: "Growth",  PlanTier: "growth",  IsRecurring: true, PriceCents: 4900},
-		{Kind: KindAgency,  Title: "Agency",  PlanTier: "agency",  IsRecurring: true, PriceCents: 19900},
-		{Kind: KindRescue,  Title: "Rescue Audit",        PlanTier: "", IsRecurring: false, PriceCents: 9900},
-		{Kind: KindDFY,     Title: "DFY Reinstatement",   PlanTier: "", IsRecurring: false, PriceCents: 49900},
+		{Kind: KindStarter, Title: "Starter", PlanTier: "pro",    IsRecurring: true, PriceCents: 1200},
+		{Kind: KindGrowth,  Title: "Growth",  PlanTier: "growth", IsRecurring: true, PriceCents: 3900},
+		{Kind: KindAgency,  Title: "Agency",  PlanTier: "agency", IsRecurring: true, PriceCents: 19900},
+		{Kind: KindRescue,  Title: "Rescue Audit", PlanTier: "",  IsRecurring: false, PriceCents: 2900},
 	}
 	envKey := map[ProductKind]string{
 		KindStarter: "GUMROAD_PRODUCT_STARTER",
 		KindGrowth:  "GUMROAD_PRODUCT_GROWTH",
 		KindAgency:  "GUMROAD_PRODUCT_AGENCY",
 		KindRescue:  "GUMROAD_PRODUCT_RESCUE",
-		KindDFY:     "GUMROAD_PRODUCT_DFY",
 	}
 	c := Catalog{
 		ByKind:      map[ProductKind]Product{},

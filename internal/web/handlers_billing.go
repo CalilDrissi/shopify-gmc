@@ -127,7 +127,6 @@ func (h *Handlers) PricingPage(w http.ResponseWriter, r *http.Request) {
 		"Title":    "Pricing",
 		"Tiers":    cat.SubscriptionTiers(),
 		"Rescue":   cat.ByKind[billing.KindRescue],
-		"DFY":      cat.ByKind[billing.KindDFY],
 		"TenantID": tenantID,
 	})
 }
@@ -182,7 +181,6 @@ func (h *Handlers) BillingPage(w http.ResponseWriter, r *http.Request) {
 	d.Data = map[string]any{
 		"Tiers":         h.GumroadCatalog.SubscriptionTiers(),
 		"Rescue":        h.GumroadCatalog.ByKind[billing.KindRescue],
-		"DFY":           h.GumroadCatalog.ByKind[billing.KindDFY],
 		"Purchases":     purchases,
 		"PendingPlan":   pendingPlan,
 		"PendingAt":     pendingAt,

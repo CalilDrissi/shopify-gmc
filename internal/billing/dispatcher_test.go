@@ -64,7 +64,7 @@ func TestDispatch_SaleFlipsPlan(t *testing.T) {
 	v := url.Values{}
 	v.Set("sale_id", "test-sale-"+uuid.NewString())
 	v.Set("product_permalink", "gmc-growth")
-	v.Set("price_cents", "4900")
+	v.Set("price_cents", "3900")
 	v.Set("currency", "USD")
 	v.Set("recurrence", "monthly")
 	v.Set("tenant_id", tenantID.String())
@@ -118,7 +118,7 @@ func TestDispatch_RefundDowngrades(t *testing.T) {
 	v := url.Values{}
 	v.Set("sale_id", saleID)
 	v.Set("product_permalink", "gmc-growth")
-	v.Set("price_cents", "4900")
+	v.Set("price_cents", "3900")
 	v.Set("recurrence", "monthly")
 	v.Set("tenant_id", tenantID.String())
 	doDispatch(t, pool, disp, billing.ParseForm(v))
@@ -157,7 +157,7 @@ func TestDispatch_IdempotentReplay(t *testing.T) {
 	v := url.Values{}
 	v.Set("sale_id", saleID)
 	v.Set("product_permalink", "gmc-starter")
-	v.Set("price_cents", "1900")
+	v.Set("price_cents", "1200")
 	v.Set("recurrence", "monthly")
 	v.Set("tenant_id", tenantID.String())
 	event := billing.ParseForm(v)

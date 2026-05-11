@@ -57,7 +57,7 @@
         {{- if eq (printf "%v" $tenant.Plan) .PlanTier }}
         <button type="button" class="c-button c-button--outlined" disabled><span class="c-button__label">Current plan</span></button>
         {{- else }}
-        <a class="c-button c-button--filled gumroad-button" href="{{ .OverlayURL }}?wanted=true&tenant_id={{ $tenant.ID }}"><span class="c-button__label">Upgrade to {{ .Title }}</span></a>
+        <a class="c-button c-button--filled gumroad-button" href="{{ .OverlayURL }}?tenant_id={{ $tenant.ID }}"><span class="c-button__label">Upgrade to {{ .Title }}</span></a>
         {{- end }}
       {{- else }}<button type="button" class="c-button c-button--outlined" disabled><span class="c-button__label">Coming soon</span></button>{{ end }}
     </div>

@@ -55,7 +55,7 @@
     <div class="c-card__footer">
       {{- if .GumroadID }}
       <a class="c-button c-button--filled gumroad-button"
-         href="{{ .OverlayURL }}?wanted=true{{ if $.TenantID }}&tenant_id={{ $.TenantID }}{{ end }}">
+         href="{{ .OverlayURL }}{{ if $.TenantID }}?tenant_id={{ $.TenantID }}{{ end }}">
         <span class="c-button__label">Upgrade to {{ .Title }}</span>
       </a>
       {{- else }}
@@ -76,19 +76,7 @@
     </div>
     <div class="c-card__body">A senior auditor walks every page of your store and submits a written report. Turnaround: 5 business days.</div>
     <div class="c-card__footer">
-      {{- if .GumroadID }}<a class="c-button c-button--filled gumroad-button" href="{{ .OverlayURL }}?wanted=true{{ if $.TenantID }}&tenant_id={{ $.TenantID }}{{ end }}"><span class="c-button__label">Buy Rescue Audit</span></a>{{ else }}<button type="button" class="c-button c-button--outlined" disabled><span class="c-button__label">Coming soon</span></button>{{ end }}
-    </div>
-  </article>
-  {{- end }}
-  {{- with .DFY }}
-  <article class="c-card c-card--filled c-tier">
-    <div class="c-card__header">
-      <h3 class="c-card__title">{{ .Title }}</h3>
-      <p class="c-card__subtitle">${{ printf "%.0f" (toFloat .PriceCents) }} one-time</p>
-    </div>
-    <div class="c-card__body">We file the GMC reinstatement on your behalf — appeal letter, evidence pack, follow-ups until resolved.</div>
-    <div class="c-card__footer">
-      {{- if .GumroadID }}<a class="c-button c-button--filled gumroad-button" href="{{ .OverlayURL }}?wanted=true{{ if $.TenantID }}&tenant_id={{ $.TenantID }}{{ end }}"><span class="c-button__label">Buy DFY Reinstatement</span></a>{{ else }}<button type="button" class="c-button c-button--outlined" disabled><span class="c-button__label">Coming soon</span></button>{{ end }}
+      {{- if .GumroadID }}<a class="c-button c-button--filled gumroad-button" href="{{ .OverlayURL }}{{ if $.TenantID }}?tenant_id={{ $.TenantID }}{{ end }}"><span class="c-button__label">Buy Rescue Audit</span></a>{{ else }}<button type="button" class="c-button c-button--outlined" disabled><span class="c-button__label">Coming soon</span></button>{{ end }}
     </div>
   </article>
   {{- end }}

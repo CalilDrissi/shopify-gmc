@@ -234,13 +234,12 @@ purchases arrive as webhooks signed with HMAC-SHA256.
 1. **Create five products** at <https://gumroad.com/products>. Set each
    product's *custom permalink* and copy it to the matching env var.
 
-   | Permalink   | Title              | Type                  | Price |
-   | ----------- | ------------------ | --------------------- | ----- |
-   | `gmc-starter` | Starter          | Subscription, monthly | $19   |
-   | `gmc-growth`  | Growth           | Subscription, monthly | $49   |
-   | `gmc-agency`  | Agency           | Subscription, monthly | $199  |
-   | `gmc-rescue`  | Rescue Audit     | Single purchase       | $99   |
-   | `gmc-dfy`     | DFY Reinstatement| Single purchase       | $499  |
+   | Permalink   | Title          | Type                  | Price |
+   | ----------- | -------------- | --------------------- | ----- |
+   | `gmc-starter` | Starter      | Subscription, monthly | $12   |
+   | `gmc-growth`  | Growth       | Subscription, monthly | $39   |
+   | `gmc-agency`  | Agency       | Subscription, monthly | $199  |
+   | `gmc-rescue`  | Rescue Audit | Single purchase       | $29   |
 
 2. **Custom fields** — on each product, add two:
    - `tenant_id` (hidden, prefilled from URL) — maps the sale to a
@@ -265,7 +264,6 @@ GUMROAD_PRODUCT_STARTER=gmc-starter
 GUMROAD_PRODUCT_GROWTH=gmc-growth
 GUMROAD_PRODUCT_AGENCY=gmc-agency
 GUMROAD_PRODUCT_RESCUE=gmc-rescue
-GUMROAD_PRODUCT_DFY=gmc-dfy
 OPERATOR_EMAIL=ops@yourdomain
 ```
 

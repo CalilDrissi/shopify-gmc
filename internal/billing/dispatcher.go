@@ -25,7 +25,7 @@ type Dispatcher struct {
 	Logger    *slog.Logger
 	Mail      mailer.Mailer
 	MailFrom  string
-	OperatorEmail string // where Rescue / DFY confirmations are CC'd
+	OperatorEmail string // where Rescue confirmations are CC'd
 }
 
 // Dispatch applies the event. Caller has already validated the HMAC
@@ -128,13 +128,6 @@ func (d *Dispatcher) handleSale(ctx context.Context, tx pgx.Tx, e Event, prod Pr
 		d.notify(ctx, e, "Rescue Audit purchased", fmt.Sprintf(
 			"You've purchased a Rescue Audit. We'll be in touch within 24 hours to schedule the deep dive.\n\nReference: %s.", e.SaleID))
 		d.notifyOperator(ctx, "Rescue Audit purchase", fmt.Sprintf(
-			"tenant=%s sale=%s email=%s", e.TenantID, e.SaleID, e.Email))
-		return nil
-
-	case KindDFY:
-		d.notify(ctx, e, "DFY Reinstatement purchased", fmt.Sprintf(
-			"Thanks — we'll handle the GMC reinstatement filing on your behalf. We'll reach out within 24 hours.\n\nReference: %s.", e.SaleID))
-		d.notifyOperator(ctx, "DFY Reinstatement purchase", fmt.Sprintf(
 			"tenant=%s sale=%s email=%s", e.TenantID, e.SaleID, e.Email))
 		return nil
 	}

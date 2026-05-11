@@ -464,9 +464,9 @@ func seedPurchases(ctx context.Context, tx pgx.Tx, id func(string) uuid.UUID) er
 		IsRecurring bool
 		PurchasedAgo time.Duration
 	}{
-		{id("purchase:sarahs-starter"),     id("tenant:sarahs-shop"),       "seed-starter-sarahs",   "gmc-starter", "starter", 1900,  true, 14 * 24 * time.Hour},
+		{id("purchase:sarahs-starter"),     id("tenant:sarahs-shop"),       "seed-starter-sarahs",   "gmc-starter", "starter", 1200,  true, 14 * 24 * time.Hour},
 		{id("purchase:growth-agency"),      id("tenant:growth-collective"), "seed-agency-growth",    "gmc-agency",  "agency",  19900, true, 21 * 24 * time.Hour},
-		{id("purchase:sarahs-rescue"),      id("tenant:sarahs-shop"),       "seed-rescue-sarahs",    "gmc-rescue",  "free",    9900,  false, 3 * 24 * time.Hour},
+		{id("purchase:sarahs-rescue"),      id("tenant:sarahs-shop"),       "seed-rescue-sarahs",    "gmc-rescue",  "free",    2900,  false, 3 * 24 * time.Hour},
 	}
 	for _, r := range rows {
 		if _, err := tx.Exec(ctx, `

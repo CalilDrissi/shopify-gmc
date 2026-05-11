@@ -42,7 +42,7 @@ func TestParseForm_SaleSubscription(t *testing.T) {
 	v := url.Values{}
 	v.Set("sale_id", "sale-123")
 	v.Set("product_permalink", "gmc-growth")
-	v.Set("price_cents", "4900")
+	v.Set("price_cents", "3900")
 	v.Set("currency", "USD")
 	v.Set("recurrence", "monthly")
 	v.Set("subscription_id", "sub-9")
@@ -60,7 +60,7 @@ func TestParseForm_SaleSubscription(t *testing.T) {
 	if e.ProductID != "gmc-growth" {
 		t.Errorf("ProductID=%q", e.ProductID)
 	}
-	if e.PriceCents != 4900 {
+	if e.PriceCents != 3900 {
 		t.Errorf("PriceCents=%d", e.PriceCents)
 	}
 	if !e.IsSubscription {
@@ -114,7 +114,6 @@ func TestCatalog_LookupByGumroadID(t *testing.T) {
 	t.Setenv("GUMROAD_PRODUCT_GROWTH", "gmc-growth")
 	t.Setenv("GUMROAD_PRODUCT_AGENCY", "gmc-agency")
 	t.Setenv("GUMROAD_PRODUCT_RESCUE", "gmc-rescue")
-	t.Setenv("GUMROAD_PRODUCT_DFY", "gmc-dfy")
 
 	c := LoadCatalog()
 
@@ -124,12 +123,11 @@ func TestCatalog_LookupByGumroadID(t *testing.T) {
 		plan string
 		recurring bool
 	}{
-		{"gmc-starter", KindStarter, "pro",     true},
-		{"gmc-growth",  KindGrowth,  "growth",  true},
-		{"gmc-agency",  KindAgency,  "agency",  true},
-		{"gmc-rescue",  KindRescue,  "",        false},
-		{"gmc-dfy",     KindDFY,     "",        false},
-		{"unknown",     KindUnknown, "",        false},
+		{"gmc-starter", KindStarter, "pro",    true},
+		{"gmc-growth",  KindGrowth,  "growth", true},
+		{"gmc-agency",  KindAgency,  "agency", true},
+		{"gmc-rescue",  KindRescue,  "",       false},
+		{"unknown",     KindUnknown, "",       false},
 	}
 	for _, tc := range cases {
 		got := c.LookupByGumroadID(tc.id)
