@@ -190,8 +190,162 @@ func TestDispatch_IdempotentReplay(t *testing.T) {
 	}
 }
 
+// TestDispatch_RefundOfOneTimeProductPreservesSubscription verifies the bug
+// fix: refunding a Rescue Audit (one-time, plan='free') for a tenant that
+// also has an active Starter subscription must NOT downgrade the tenant.
+// Pre-fix, the dispatcher's refund handler unconditionally set plan='free'
+// for the tenant, silently revoking service from paying customers.
+func TestDispatch_RefundOfOneTimeProductPreservesSubscription(t *testing.T) {
+	t.Setenv("GUMROAD_PRODUCT_STARTER", "gmc-starter")
+	t.Setenv("GUMROAD_PRODUCT_RESCUE", "gmc-rescue")
+	pool := requirePool(t)
+	tenantID := seedTenant(t, pool, "pro") // already a paying Starter customer
+
+	disp := &billing.Dispatcher{Pool: pool, Catalog: billing.LoadCatalog()}
+
+	// First: the existing Starter sale row (so the tenant has a recorded
+	// active subscription purchase). The dispatcher would have written it
+	// on the original sale; we shortcut here.
+	starterSale := "sale-starter-" + uuid.NewString()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO purchases (tenant_id, gumroad_sale_id, plan, amount_cents, currency, status, purchased_at)
+		VALUES ($1, $2, 'pro'::plan_tier, 1200, 'USD', 'active'::purchase_status, now())
+	`, tenantID, starterSale)
+	if err != nil {
+		t.Fatalf("seed starter purchase: %v", err)
+	}
+
+	// Now: the buyer purchases a one-time Rescue Audit. That writes a
+	// purchases row with plan='free' (one-time charges don't change the
+	// tenant plan).
+	rescueSale := "sale-rescue-" + uuid.NewString()
+	v := url.Values{}
+	v.Set("sale_id", rescueSale)
+	v.Set("product_permalink", "gmc-rescue")
+	v.Set("price_cents", "2900")
+	v.Set("tenant_id", tenantID.String())
+	doDispatch(t, pool, disp, billing.ParseForm(v))
+
+	// Sanity check: tenant should still be on `pro` after a Rescue sale.
+	var plan string
+	_ = pool.QueryRow(context.Background(), `SELECT plan::text FROM tenants WHERE id=$1`, tenantID).Scan(&plan)
+	if plan != "pro" {
+		t.Fatalf("after Rescue sale plan=%q; want pro", plan)
+	}
+
+	// The bug-triggering event: refund of the Rescue purchase.
+	r := url.Values{}
+	r.Set("resource_name", "refund")
+	r.Set("sale_id", rescueSale)
+	r.Set("refunded", "true")
+	r.Set("refunded_at", time.Now().UTC().Format(time.RFC3339))
+	r.Set("tenant_id", tenantID.String())
+	doDispatch(t, pool, disp, billing.ParseForm(r))
+
+	// Post-fix expectation: Rescue purchase marked refunded, but the
+	// tenant's Starter subscription stays intact.
+	var rescueStatus, starterStatus string
+	_ = pool.QueryRow(context.Background(), `SELECT plan::text FROM tenants WHERE id=$1`, tenantID).Scan(&plan)
+	_ = pool.QueryRow(context.Background(), `SELECT status::text FROM purchases WHERE gumroad_sale_id=$1`, rescueSale).Scan(&rescueStatus)
+	_ = pool.QueryRow(context.Background(), `SELECT status::text FROM purchases WHERE gumroad_sale_id=$1`, starterSale).Scan(&starterStatus)
+	if plan != "pro" {
+		t.Errorf("plan=%q after Rescue refund; want pro (active subscription must survive)", plan)
+	}
+	if rescueStatus != "refunded" {
+		t.Errorf("rescue purchase status=%q; want refunded", rescueStatus)
+	}
+	if starterStatus != "active" {
+		t.Errorf("starter purchase status=%q; want active (refund must NOT touch other purchases)", starterStatus)
+	}
+}
+
+// TestDispatch_SubscriptionUpdated verifies a subscription_updated event
+// for a recurring product flips the tenant to the new plan and records the
+// renewal date.
+func TestDispatch_SubscriptionUpdated(t *testing.T) {
+	t.Setenv("GUMROAD_PRODUCT_GROWTH", "gmc-growth")
+	pool := requirePool(t)
+	tenantID := seedTenant(t, pool, "pro")
+	disp := &billing.Dispatcher{Pool: pool, Catalog: billing.LoadCatalog()}
+
+	v := url.Values{}
+	v.Set("resource_name", "subscription_updated")
+	v.Set("sale_id", "sale-upd-"+uuid.NewString())
+	v.Set("product_permalink", "gmc-growth")
+	v.Set("price_cents", "3900")
+	v.Set("recurrence", "monthly")
+	v.Set("tenant_id", tenantID.String())
+	doDispatch(t, pool, disp, billing.ParseForm(v))
+
+	var plan string
+	_ = pool.QueryRow(context.Background(), `SELECT plan::text FROM tenants WHERE id=$1`, tenantID).Scan(&plan)
+	if plan != "growth" {
+		t.Errorf("plan=%q after subscription_updated; want growth", plan)
+	}
+}
+
+// TestDispatch_SubscriptionCancelled verifies a cancellation schedules the
+// downgrade for the end of the billing period instead of revoking access
+// immediately.
+func TestDispatch_SubscriptionCancelled(t *testing.T) {
+	pool := requirePool(t)
+	tenantID := seedTenant(t, pool, "growth")
+	disp := &billing.Dispatcher{Pool: pool, Catalog: billing.LoadCatalog()}
+
+	endsAt := time.Now().UTC().Add(14 * 24 * time.Hour).Truncate(time.Second)
+	v := url.Values{}
+	v.Set("resource_name", "subscription_cancelled")
+	v.Set("subscription_id", "sub-99")
+	v.Set("ends_at", endsAt.Format(time.RFC3339))
+	v.Set("tenant_id", tenantID.String())
+	doDispatch(t, pool, disp, billing.ParseForm(v))
+
+	var plan string
+	var pendingPlan *string
+	var pendingAt *time.Time
+	err := pool.QueryRow(context.Background(), `
+		SELECT plan::text, pending_plan::text, pending_plan_at
+		FROM tenants WHERE id=$1
+	`, tenantID).Scan(&plan, &pendingPlan, &pendingAt)
+	if err != nil {
+		t.Fatalf("query tenant: %v", err)
+	}
+	if plan != "growth" {
+		t.Errorf("plan=%q after cancel; want growth (keep until period ends)", plan)
+	}
+	if pendingPlan == nil || *pendingPlan != "free" {
+		t.Errorf("pending_plan=%v; want free", pendingPlan)
+	}
+	if pendingAt == nil || pendingAt.Sub(endsAt).Abs() > time.Minute {
+		t.Errorf("pending_plan_at=%v; want %v", pendingAt, endsAt)
+	}
+}
+
+// TestDispatch_SubscriptionEnded verifies the period-elapsed event
+// downgrades the tenant immediately.
+func TestDispatch_SubscriptionEnded(t *testing.T) {
+	pool := requirePool(t)
+	tenantID := seedTenant(t, pool, "growth")
+	disp := &billing.Dispatcher{Pool: pool, Catalog: billing.LoadCatalog()}
+
+	v := url.Values{}
+	v.Set("resource_name", "subscription_ended")
+	v.Set("subscription_id", "sub-99")
+	v.Set("tenant_id", tenantID.String())
+	doDispatch(t, pool, disp, billing.ParseForm(v))
+
+	var plan string
+	_ = pool.QueryRow(context.Background(), `SELECT plan::text FROM tenants WHERE id=$1`, tenantID).Scan(&plan)
+	if plan != "free" {
+		t.Errorf("plan=%q after subscription_ended; want free", plan)
+	}
+}
+
 // doDispatch runs the canonical "insert event row + dispatch" pair in one
-// tx, matching what the HTTP handler does on a successful webhook.
+// tx, matching what the HTTP handler does on a successful webhook. Empty
+// sale_id is stored as NULL so the partial unique index (event_type,
+// sale_id) WHERE sale_id IS NOT NULL does not collapse independent
+// subscription_cancelled / subscription_ended events.
 func doDispatch(t *testing.T, pool *pgxpool.Pool, disp *billing.Dispatcher, event billing.Event) {
 	t.Helper()
 	tx, err := pool.Begin(context.Background())
@@ -202,7 +356,7 @@ func doDispatch(t *testing.T, pool *pgxpool.Pool, disp *billing.Dispatcher, even
 	var rowID uuid.UUID
 	if err := tx.QueryRow(context.Background(), `
 		INSERT INTO gumroad_webhook_events (event_type, sale_id, payload, signature_ok)
-		VALUES ($1, $2, '{}'::jsonb, true) RETURNING id
+		VALUES ($1, NULLIF($2,''), '{}'::jsonb, true) RETURNING id
 	`, event.Type, event.SaleID).Scan(&rowID); err != nil {
 		t.Fatalf("insert event: %v", err)
 	}

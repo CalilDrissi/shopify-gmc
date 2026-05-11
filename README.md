@@ -241,20 +241,24 @@ purchases arrive as webhooks signed with HMAC-SHA256.
    | `gmc-agency`  | Agency       | Subscription, monthly | $199  |
    | `gmc-rescue`  | Rescue Audit | Single purchase       | $29   |
 
-2. **Custom fields** — on each product, add two:
-   - `tenant_id` (hidden, prefilled from URL) — maps the sale to a
-     workspace.
-   - `user_email` (visible, optional) — informational.
+2. **Tenant mapping** — no Gumroad-side custom fields needed. Our
+   pricing/billing pages append `?tenant_id=<uuid>` to the overlay URL
+   when a signed-in user clicks Upgrade; Gumroad propagates URL params
+   into the webhook payload as `url_params[tenant_id]`, which
+   `billing.ParseForm` reads (see `TestParseForm_AcceptsURLParamPrefixedTenantID`).
+   Anonymous purchases from the public pricing page land without a
+   tenant and are matched after the fact (or surfaced as orphans).
 
 3. **Post-purchase redirect** — for every product set the redirect to
    `{BASE_URL}/t/PLACEHOLDER/billing?gumroad_return=1`. The buyer's
    browser polls a "processing payment" page until our webhook lands.
 
-4. **Webhook URL** — Gumroad → Settings → Advanced → Resource
-   subscriptions. Add `sale`, `subscription_updated`,
-   `subscription_cancelled`, `subscription_ended`, `refund` subscriptions
-   pointing at `{BASE_URL}/webhooks/gumroad`. Copy the shared HMAC
-   secret to `GUMROAD_WEBHOOK_SECRET`.
+4. **Ping URL** — Gumroad → Settings → Advanced → Ping URL. Set to
+   `{BASE_URL}/webhooks/gumroad`. Gumroad signs every ping with your
+   **application_secret** (Settings → Advanced → Applications → your
+   app); paste that into `GUMROAD_WEBHOOK_SECRET`. One ping URL covers
+   all 5 event types (`sale`, `subscription_updated`,
+   `subscription_cancelled`, `subscription_ended`, `refund`).
 
 #### Server configuration
 

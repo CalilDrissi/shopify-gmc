@@ -40,6 +40,15 @@ func (d *Dispatcher) Dispatch(ctx context.Context, tx pgx.Tx, eventRowID uuid.UU
 		d.Logger = slog.Default()
 	}
 	if e.TenantID == uuid.Nil && e.Type != "ping" {
+		// Anonymous purchase from the public pricing page (no signed-in
+		// user → no tenant_id URL param). The buyer paid; we can't apply
+		// the plan without knowing the workspace. Alert the operator so
+		// it can be reconciled by hand (or contact the buyer for a tenant
+		// slug). markErr persists the message on the event row.
+		d.notifyOperator(ctx, "Gumroad sale without tenant_id", fmt.Sprintf(
+			"type=%s product=%s sale=%s email=%s price_cents=%d\n\n"+
+				"The buyer purchased from /pricing while signed out — there is no tenant_id to apply the plan to. Manual reconciliation needed: find or create the buyer's workspace and run the appropriate plan flip.",
+			e.Type, e.ProductID, e.SaleID, e.Email, e.PriceCents))
 		return d.markErr(ctx, tx, eventRowID, "missing tenant_id custom field")
 	}
 
@@ -74,9 +83,18 @@ func (d *Dispatcher) Dispatch(ctx context.Context, tx pgx.Tx, eventRowID uuid.UU
 	if err != nil {
 		return d.markErr(ctx, tx, eventRowID, err.Error())
 	}
+	// NULLIF on sale_id keeps it NULL for events that don't carry one
+	// (subscription_cancelled / subscription_ended / ping). Writing the
+	// empty string would otherwise collide with the partial unique index
+	// `(event_type, sale_id) WHERE sale_id IS NOT NULL` once a second
+	// event of the same type arrived.
 	_, err = tx.Exec(ctx, `
 		UPDATE gumroad_webhook_events
-		SET processed_at = now(), tenant_id = $2, product_id = $3, sale_id = $4, signature_ok = true
+		SET processed_at = now(),
+		    tenant_id    = $2,
+		    product_id   = NULLIF($3,''),
+		    sale_id      = NULLIF($4,''),
+		    signature_ok = true
 		WHERE id = $1
 	`, eventRowID, nullableUUID(e.TenantID), e.ProductID, e.SaleID)
 	return err
@@ -130,8 +148,22 @@ func (d *Dispatcher) handleSale(ctx context.Context, tx pgx.Tx, e Event, prod Pr
 		d.notifyOperator(ctx, "Rescue Audit purchase", fmt.Sprintf(
 			"tenant=%s sale=%s email=%s", e.TenantID, e.SaleID, e.Email))
 		return nil
+
+	default:
+		// KindUnknown — Gumroad delivered a sale for a product we don't
+		// recognise (env var unset, permalink renamed in Gumroad, or a new
+		// product not yet wired). The buyer's card was charged but we can't
+		// flip a plan; alert the operator so it can be reconciled by hand.
+		d.Logger.Warn("gumroad_unknown_product",
+			slog.String("product_id", e.ProductID),
+			slog.String("sale_id", e.SaleID),
+			slog.String("tenant_id", e.TenantID.String()))
+		d.notifyOperator(ctx, "Gumroad sale for UNKNOWN product", fmt.Sprintf(
+			"product_permalink=%s tenant=%s sale=%s email=%s price_cents=%d\n\n"+
+				"Buyer was charged but no plan was applied. Either wire GUMROAD_PRODUCT_* for this permalink and restart, or refund the sale on Gumroad's dashboard.",
+			e.ProductID, e.TenantID, e.SaleID, e.Email, e.PriceCents))
+		return nil
 	}
-	return nil
 }
 
 // upsertPurchase inserts or updates the purchases row keyed by sale_id.
@@ -231,16 +263,34 @@ func (d *Dispatcher) handleSubscriptionEnded(ctx context.Context, tx pgx.Tx, e E
 // ----------------------------------------------------------------------------
 
 func (d *Dispatcher) handleRefund(ctx context.Context, tx pgx.Tx, e Event) error {
-	if _, err := tx.Exec(ctx, `
+	// Mark the refunded purchase and capture its plan in the same round-trip.
+	// We need the plan to decide whether to downgrade the tenant: refunding
+	// a one-time charge (Rescue Audit — purchases.plan='free') must NOT
+	// revoke an unrelated active subscription on the same tenant.
+	var refundedPlan string
+	err := tx.QueryRow(ctx, `
 		UPDATE purchases
 		SET status = 'refunded'::purchase_status,
 		    refunded_at = COALESCE($2, now()),
 		    updated_at = now()
 		WHERE gumroad_sale_id = $1
-	`, e.SaleID, e.RefundedAt); err != nil {
+		RETURNING plan::text
+	`, e.SaleID, e.RefundedAt).Scan(&refundedPlan)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Refund for a sale we never recorded — log and stop. We can't
+			// safely downgrade a tenant without knowing which subscription
+			// this refund cancelled.
+			d.Logger.Warn("gumroad_refund_unknown_sale", slog.String("sale_id", e.SaleID))
+			return nil
+		}
 		return err
 	}
-	_, err := tx.Exec(ctx, `
+	if refundedPlan == "" || refundedPlan == "free" {
+		// One-time charge — no subscription to revoke.
+		return nil
+	}
+	_, err = tx.Exec(ctx, `
 		UPDATE tenants
 		SET plan = 'free'::plan_tier,
 		    plan_renews_at = NULL,
