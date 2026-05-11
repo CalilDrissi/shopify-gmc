@@ -29,22 +29,6 @@
     Mailbox <code>{{ .Email }}</code> suspended (auth rejected; mail still delivers).
     {{- else if eq .Kind "unsuspend" }}
     Mailbox <code>{{ .Email }}</code> unsuspended.
-    {{- else if eq .Kind "vacation-on" }}
-    Vacation auto-reply <strong>enabled</strong> for <code>{{ .Email }}</code>.
-    {{- else if eq .Kind "vacation-off" }}
-    Vacation auto-reply <strong>disabled</strong> for <code>{{ .Email }}</code>.
-    {{- else if eq .Kind "filter-add" }}
-    Filter rule for <code>{{ .Email }}</code> added (<strong>{{ .Right }}</strong>).
-    {{- else if eq .Kind "filter-del" }}
-    Filter rule #<strong>{{ .Right }}</strong> for <code>{{ .Email }}</code> removed.
-    {{- else if eq .Kind "spam-add" }}
-    Added to <strong>{{ .Right }}</strong> for <code>{{ .Email }}</code>.
-    {{- else if eq .Kind "spam-del" }}
-    Removed from <strong>{{ .Right }}</strong> for <code>{{ .Email }}</code>.
-    {{- else if eq .Kind "spam-threshold" }}
-    Spam threshold for <code>{{ .Email }}</code> set to <strong>{{ .Right }}</strong>.
-    {{- else if eq .Kind "spam-threshold-norspamd" }}
-    Threshold saved for <code>{{ .Email }}</code> — rspamd is not running, so score-based filtering won't fire until it's installed.
     {{- else if eq .Kind "alias" }}
     Alias <code>{{ .Email }}</code> → <code>{{ .Right }}</code> created.
     {{- else if eq .Kind "unalias" }}
@@ -61,11 +45,7 @@
 </article>
 {{- end }}
 
-<div style="margin-top:24px; display:flex; justify-content:flex-end;">
-  <a href="/admin/mail/import" class="c-button c-button--outlined"{{ if not .Configured }} aria-disabled="true" tabindex="-1" style="pointer-events:none; opacity:0.5;"{{ end }}><span class="c-button__label">Bulk import (CSV)</span></a>
-</div>
-
-<section style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
+<section style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px;">
   <article class="c-card c-card--outlined">
     <div class="c-card__header"><h2 class="c-card__title">Add mailbox</h2></div>
     <div class="c-card__body">
@@ -168,10 +148,6 @@
             </form>
           </td>
           <td class="c-mailbox-actions" style="padding:10px 0; text-align:right;">
-            <a href="/admin/mail/activity?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Recent mail.log activity for {{ .Email }}"><span class="c-button__label">Activity</span></a>
-            <a href="/admin/mail/vacation?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Vacation auto-reply"><span class="c-button__label">Vacation</span>{{ if .Vacation.Enabled }} <span style="margin-left:4px; padding:1px 6px; border-radius:8px; background:#1b873f; color:#fff; font-size:0.7rem;">on</span>{{ end }}</a>
-            <a href="/admin/mail/filters?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Inbox filter rules"><span class="c-button__label">Filters</span></a>
-            <a href="/admin/mail/spam?email={{ .Email }}" class="c-button c-button--text c-button--small" title="Whitelist / blacklist / threshold"><span class="c-button__label">Spam</span></a>
             <form method="post" action="/admin/mail/suspend" class="js-needs-confirm" style="margin:0;"
                   data-confirm-title="{{ if .Suspended }}Unsuspend mailbox{{ else }}Suspend mailbox{{ end }}"
                   data-confirm-message="{{ if .Suspended }}Unsuspend {{ .Email }}? Auth will be re-enabled.{{ else }}Suspend {{ .Email }}? Auth will be rejected; mail keeps delivering.{{ end }}"

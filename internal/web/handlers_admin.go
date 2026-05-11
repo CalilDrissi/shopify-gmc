@@ -145,31 +145,23 @@ func (h *AdminHandlers) startAdminSession(w http.ResponseWriter, r *http.Request
 // Admin dashboard / tenants list / tenant detail
 // ============================================================================
 
-func (h *AdminHandlers) Dashboard(w http.ResponseWriter, r *http.Request) {
-	d := h.adminCtx(r)
-	if d == nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
-		return
-	}
-	pool := h.Pool
-	var counts struct {
-		Tenants, Users, Admins, Members int
-	}
-	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM tenants`).Scan(&counts.Tenants)
-	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM users`).Scan(&counts.Users)
-	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM platform_admins`).Scan(&counts.Admins)
-	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM memberships`).Scan(&counts.Members)
-	d.Title = "Platform admin"
-	d.Data = counts
-	h.renderAdmin(w, r, "admin-dashboard", *d)
-}
-
 type tenantsListRow struct {
 	Tenant      *store.Tenant
 	OwnerEmail  *string
 	MemberCount int
 }
 
+type tenantsPageData struct {
+	Counts struct {
+		Tenants, Users, Admins, Members int
+	}
+	Tenants []tenantsListRow
+}
+
+// TenantsList serves /admin/tenants — also the platform-admin landing
+// page now (the standalone dashboard was collapsed into this one). The
+// four count tiles at the top replace the old dashboard's signal; the
+// tenants table below is what an operator actually clicks into.
 func (h *AdminHandlers) TenantsList(w http.ResponseWriter, r *http.Request) {
 	d := h.adminCtx(r)
 	if d == nil {
@@ -177,6 +169,12 @@ func (h *AdminHandlers) TenantsList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pool := h.Pool
+	var data tenantsPageData
+	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM tenants`).Scan(&data.Counts.Tenants)
+	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM users`).Scan(&data.Counts.Users)
+	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM platform_admins`).Scan(&data.Counts.Admins)
+	_ = pool.QueryRow(r.Context(), `SELECT count(*) FROM memberships`).Scan(&data.Counts.Members)
+
 	rows, err := pool.Query(r.Context(), `
 		SELECT t.id, t.name, t.slug, t.kind::text, t.plan::text, t.suspended_at, t.created_at, t.updated_at,
 		       (SELECT email FROM users u JOIN memberships m ON m.user_id=u.id
@@ -191,7 +189,6 @@ func (h *AdminHandlers) TenantsList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rows.Close()
-	var list []tenantsListRow
 	for rows.Next() {
 		var t store.Tenant
 		var owner *string
@@ -200,12 +197,11 @@ func (h *AdminHandlers) TenantsList(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&t.ID, &t.Name, &t.Slug, &t.Kind, &t.Plan, &suspendedAt, &t.CreatedAt, &t.UpdatedAt, &owner, &memberCount); err != nil {
 			continue
 		}
-		// We don't have suspended_at in the Tenant struct yet; carry separately if needed.
 		_ = suspendedAt
-		list = append(list, tenantsListRow{Tenant: &t, OwnerEmail: owner, MemberCount: memberCount})
+		data.Tenants = append(data.Tenants, tenantsListRow{Tenant: &t, OwnerEmail: owner, MemberCount: memberCount})
 	}
 	d.Title = "Tenants"
-	d.Data = list
+	d.Data = data
 	h.renderAdmin(w, r, "admin-tenants", *d)
 }
 

@@ -195,7 +195,6 @@ func main() {
 		{Name: "gmc-picker", Layout: "templates/layouts/public.html", Template: "templates/pages/gmc-picker.html"},
 		{Name: "billing", Layout: "templates/layouts/tenant.html", Template: "templates/pages/billing.html"},
 		{Name: "admin-login", Layout: "templates/layouts/public.html", Template: "templates/pages/admin-login.html"},
-		{Name: "admin-dashboard", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-dashboard.html"},
 		{Name: "admin-tenants", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-tenants.html"},
 		{Name: "admin-tenant-detail", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-tenant-detail.html"},
 		{Name: "admin-audit-log", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-audit-log.html"},
@@ -203,12 +202,6 @@ func main() {
 		{Name: "admin-settings", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-settings.html"},
 		{Name: "admin-gmc", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-gmc.html"},
 		{Name: "admin-mail", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail.html"},
-		{Name: "admin-mail-import", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-import.html"},
-		{Name: "admin-mail-import-result", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-import-result.html"},
-		{Name: "admin-mail-activity", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-activity.html"},
-		{Name: "admin-mail-vacation", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-vacation.html"},
-		{Name: "admin-mail-filters", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-filters.html"},
-		{Name: "admin-mail-spam", Layout: "templates/layouts/platform.html", Template: "templates/pages/admin-mail-spam.html"},
 	}
 	if err := rend.Register(pages); err != nil {
 		log.Fatalf("register pages: %v", err)
@@ -437,8 +430,15 @@ func main() {
 	mux.HandleFunc("GET /admin/login", adminH.LoginForm)
 	mux.HandleFunc("POST /admin/login", adminH.Login)
 	mux.HandleFunc("POST /admin/logout", adminH.Logout)
-	mux.HandleFunc("GET /admin/{$}", adminH.Dashboard)
-	mux.HandleFunc("GET /admin", adminH.Dashboard)
+	// /admin and /admin/ both go to the tenants list (which now hosts the
+	// dashboard count tiles at the top). The standalone dashboard page was
+	// dropped — its only signal was 4 counts which we surface here instead.
+	mux.HandleFunc("GET /admin/{$}", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/tenants", http.StatusFound)
+	})
+	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/tenants", http.StatusFound)
+	})
 	mux.HandleFunc("GET /admin/tenants", adminH.TenantsList)
 	mux.HandleFunc("GET /admin/tenants/{id}", adminH.TenantDetail)
 	mux.HandleFunc("POST /admin/tenants/{id}/suspend", adminH.TenantSuspend)
@@ -456,19 +456,7 @@ func main() {
 	mux.HandleFunc("POST /admin/mail/alias", adminH.MailAlias)
 	mux.HandleFunc("POST /admin/mail/unalias", adminH.MailUnalias)
 	mux.HandleFunc("POST /admin/mail/quota", adminH.MailQuota)
-	mux.HandleFunc("GET /admin/mail/import", adminH.MailImportPage)
-	mux.HandleFunc("POST /admin/mail/import", adminH.MailImportSubmit)
-	mux.HandleFunc("GET /admin/mail/activity", adminH.MailActivity)
 	mux.HandleFunc("POST /admin/mail/suspend", adminH.MailSuspend)
-	mux.HandleFunc("GET /admin/mail/vacation", adminH.MailVacationGet)
-	mux.HandleFunc("POST /admin/mail/vacation", adminH.MailVacationSave)
-	mux.HandleFunc("GET /admin/mail/filters", adminH.MailFilters)
-	mux.HandleFunc("POST /admin/mail/filters/add", adminH.MailFilterAdd)
-	mux.HandleFunc("POST /admin/mail/filters/del", adminH.MailFilterDel)
-	mux.HandleFunc("GET /admin/mail/spam", adminH.MailSpamGet)
-	mux.HandleFunc("POST /admin/mail/spam/add", adminH.MailSpamAdd)
-	mux.HandleFunc("POST /admin/mail/spam/del", adminH.MailSpamDel)
-	mux.HandleFunc("POST /admin/mail/spam/threshold", adminH.MailSpamThreshold)
 	mux.HandleFunc("GET /admin/settings", adminH.SettingsPage)
 	mux.HandleFunc("POST /admin/settings", adminH.SettingsSave)
 	mux.HandleFunc("GET /admin/settings/test-connection", adminH.SettingsTestConnection)

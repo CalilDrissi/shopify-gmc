@@ -33,16 +33,11 @@
     <div class="l-platform__scrim" :class="{ 'is-open': navOpen }" @click="navOpen = false" aria-hidden="true"></div>
     <aside class="l-platform__sidebar" id="platform-sidebar" :class="{ 'is-open': navOpen }">
       <nav @click="navOpen = false">
-        <a href="/admin">Dashboard</a>
         <a href="/admin/tenants">Tenants</a>
-        <a href="/admin/users">Users</a>
-        <a href="/admin/audits">Audits</a>
-        <a href="/admin/jobs">Jobs</a>
-        <a href="/admin/admins">Admins</a>
-        <a href="/admin/audit-log">Audit log</a>
         <a href="/admin/billing-events">Billing events</a>
         <a href="/admin/gmc">GMC</a>
         <a href="/admin/mail">Mail</a>
+        <a href="/admin/audit-log">Audit log</a>
         {{ if and .Admin (eq .Admin.Role "super") }}<a href="/admin/settings">Settings</a>{{ end }}
       </nav>
     </aside>

@@ -1,5 +1,26 @@
 {{ define "content" }}
+{{- $counts := .Data.Counts -}}
 <h1 class="page-title">Tenants</h1>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:16px;">
+  <article class="c-card c-card--outlined" style="padding:14px 16px;">
+    <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;">Tenants</div>
+    <div style="font-size:1.75rem; font-weight:700;">{{ $counts.Tenants }}</div>
+  </article>
+  <article class="c-card c-card--outlined" style="padding:14px 16px;">
+    <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;">Users</div>
+    <div style="font-size:1.75rem; font-weight:700;">{{ $counts.Users }}</div>
+  </article>
+  <article class="c-card c-card--outlined" style="padding:14px 16px;">
+    <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;">Memberships</div>
+    <div style="font-size:1.75rem; font-weight:700;">{{ $counts.Members }}</div>
+  </article>
+  <article class="c-card c-card--outlined" style="padding:14px 16px;">
+    <div style="color:var(--md-sys-color-on-surface-variant); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;">Platform admins</div>
+    <div style="font-size:1.75rem; font-weight:700;">{{ $counts.Admins }}</div>
+  </article>
+</div>
+
 <article class="c-card c-card--outlined">
   <div class="c-card__body">
     <table style="width:100%; border-collapse:collapse;">
@@ -13,7 +34,7 @@
         </tr>
       </thead>
       <tbody>
-        {{- range .Data }}
+        {{- range .Data.Tenants }}
         <tr style="border-top:1px solid var(--md-sys-color-outline-variant);">
           <td style="padding:12px 0;">
             <a href="/admin/tenants/{{ .Tenant.ID }}"><strong>{{ .Tenant.Name }}</strong></a>
