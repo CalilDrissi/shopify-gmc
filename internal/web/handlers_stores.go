@@ -298,7 +298,7 @@ func pingURL(ctx context.Context, target string, timeout time.Duration) error {
 		if err != nil {
 			return err
 		}
-		req.Header.Set("User-Agent", "GMCAuditBot/1.0 (verifying store URL)")
+		req.Header.Set("User-Agent", "ShopifyGMCBot/1.0 (verifying store URL)")
 		resp, err := client.Do(req)
 		if err != nil {
 			return err

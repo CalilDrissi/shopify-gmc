@@ -22,7 +22,7 @@ func instructionsProductIdentifierPresent() audit.FixInstructions {
 				Path:   "Shopify admin → Products → {product name} → Metafields → google.identifier_exists",
 				Detail: "Set the metafield value to false (boolean). GMC accepts this as a valid response."},
 			{Number: 5, Action: "Re-run the audit to confirm the fix.",
-				Path: "gmcauditor → Stores → {store} → Run audit"},
+				Path: "shopifygmc → Stores → {store} → Run audit"},
 		},
 		DocsURL:      "https://support.google.com/merchants/answer/6324461",
 		WhyItMatters: "GMC matches your products to its catalog by GTIN. Listings without one are eligible for disapproval, get worse impressions, and are excluded from price-comparison surfaces like Shopping listings.",

@@ -1,7 +1,7 @@
 // Package crawler fetches a Shopify storefront and produces an audit.CheckContext.
 //
 // Constraints (per /internal/crawler design):
-//   - Honours robots.txt for the GMCAuditBot/1.0 user agent.
+//   - Honours robots.txt for the ShopifyGMCBot/1.0 user agent.
 //   - Per-store rate limit: 2 rps; per-store concurrent: 5.
 //   - Global concurrent: 20.
 //   - 15s timeout; 3 redirects max.
@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	UserAgent       = "GMCAuditBot/1.0 (+https://gmcauditor.local/bot)"
+	UserAgent       = "ShopifyGMCBot/1.0 (+https://shopifygmc.com/bot)"
 	defaultTimeout  = 15 * time.Second
 	maxRedirects    = 3
 	perStoreRPS     = 2

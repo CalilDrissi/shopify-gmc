@@ -646,7 +646,7 @@ func (h *Handlers) ReportPDF(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition",
-		fmt.Sprintf(`attachment; filename="gmcauditor-%s-%s.pdf"`, v.StoreDomain, v.ID.String()[:8]))
+		fmt.Sprintf(`attachment; filename="shopifygmc-%s-%s.pdf"`, v.StoreDomain, v.ID.String()[:8]))
 	_, _ = w.Write(pdfBytes)
 }
 

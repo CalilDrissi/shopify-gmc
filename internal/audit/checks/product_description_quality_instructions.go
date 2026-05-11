@@ -16,7 +16,7 @@ func instructionsProductDescriptionQuality() audit.FixInstructions {
 			{Number: 3, Action: "If the description shows literal HTML (\"&lt;br&gt;\" or \"&nbsp;\"), the source was pasted as text instead of rich text.",
 				Path: "Shopify admin → Products → {product name} → Description → Toggle HTML editor → paste cleanly"},
 			{Number: 4, Action: "Re-save and re-run the audit.",
-				Path: "gmcauditor → Stores → {store} → Run audit"},
+				Path: "shopifygmc → Stores → {store} → Run audit"},
 		},
 		DocsURL:      "https://support.google.com/merchants/answer/6324468",
 		WhyItMatters: "Description is one of the strongest ranking signals for Shopping. Thin or duplicated copy across SKUs causes Google to choose a single \"canonical\" listing per group and ignore the rest.",

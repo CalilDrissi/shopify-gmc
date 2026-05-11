@@ -10,7 +10,7 @@ const verifyEmailHTML = `<!DOCTYPE html>
 <html><body style="font-family: system-ui, -apple-system, sans-serif; padding: 24px; background:#fef7ff; color:#1d1b20;">
 <div style="max-width:520px; margin:0 auto; background:#fff; border-radius:12px; padding:32px;">
 <h1 style="margin-top:0;">Confirm your email</h1>
-<p>Welcome to gmcauditor, {{.Name}}.</p>
+<p>Welcome to shopifygmc, {{.Name}}.</p>
 <p>Click the link below to confirm your email address. This link expires in 24 hours.</p>
 <p><a href="{{.URL}}" style="display:inline-block; padding:12px 24px; background:#6750A4; color:#fff; border-radius:9999px; text-decoration:none;">Confirm email</a></p>
 <p style="color:#49454F; font-size:14px;">Or paste this URL into your browser:<br><code>{{.URL}}</code></p>
@@ -107,7 +107,7 @@ const auditAlertHTML = `<!DOCTYPE html>
 
 <p style="margin-top:32px; padding-top:16px; border-top:1px solid #ECE6F0; color:#79747E; font-size:12px;">
   You're receiving this because you subscribed to <code>{{.Trigger}}</code> alerts for <strong>{{.StoreName}}</strong>.<br>
-  <a href="{{.UnsubscribeURL}}" style="color:#79747E;">Unsubscribe from {{.Trigger}}</a> · gmcauditor
+  <a href="{{.UnsubscribeURL}}" style="color:#79747E;">Unsubscribe from {{.Trigger}}</a> · shopifygmc
 </p>
 </div>
 </body></html>`

@@ -15,7 +15,7 @@ func instructionsBrokenProductLinks() audit.FixInstructions {
 			{Number: 3, Action: "If the link is a typo in a theme, fix it in the theme code.",
 				Path: "Shopify admin → Online Store → Themes → … → Edit code"},
 			{Number: 4, Action: "Re-run the audit to confirm.",
-				Path: "gmcauditor → Stores → {store} → Run audit"},
+				Path: "shopifygmc → Stores → {store} → Run audit"},
 		},
 		DocsURL:      "https://help.shopify.com/en/manual/online-store/menus-and-links/url-redirect",
 		WhyItMatters: "Every 404 from a Shopping ad is wasted spend and a quality penalty. GMC tracks link health and disapproves products that 404. Customer trust degrades fast on broken navigation.",

@@ -106,7 +106,7 @@ func (h *Handlers) GMCCallback(w http.ResponseWriter, r *http.Request) {
 		// to redirect them to revoke our app at https://myaccount.google.com/permissions
 		// or call accounts.revoke ourselves to force a re-consent.
 		h.renderError(w, http.StatusBadRequest,
-			"Google didn't return a refresh token. Open https://myaccount.google.com/permissions, remove gmcauditor, then retry the connect.")
+			"Google didn't return a refresh token. Open https://myaccount.google.com/permissions, remove shopifygmc, then retry the connect.")
 		return
 	}
 

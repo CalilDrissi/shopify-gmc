@@ -16,7 +16,7 @@ func instructionsProductTitleQuality() audit.FixInstructions {
 			{Number: 3, Action: "Keep titles under 150 characters. Google truncates around ~70 chars in Shopping ads anyway.",
 				Path: "Shopify admin → Products → {product name} → Title"},
 			{Number: 4, Action: "Re-save and re-run the audit.",
-				Path: "gmcauditor → Stores → {store} → Run audit"},
+				Path: "shopifygmc → Stores → {store} → Run audit"},
 		},
 		DocsURL:      "https://support.google.com/merchants/answer/6324415",
 		WhyItMatters: "Title quality directly affects GMC ad rank and click-through. ALL CAPS and excessive punctuation also trigger the \"promotional language\" disapproval reason in GMC and can suspend the entire account.",
